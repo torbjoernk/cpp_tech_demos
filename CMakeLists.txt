@@ -1,2 +1,16 @@
 cmake_minimum_required(VERSION 3.1)
 project(cpp_tech_demo)
+
+option(demo_concepts "enable C++ concepts demo" OFF)
+option(demo_mongodb "enable MongoDB demo" OFF)
+option(demo_qt5     "enable Qt5 demo"     OFF)
+
+if(demo_concepts)
+    add_subdirectory(concepts)
+endif()
+if(demo_mongodb)
+    add_subdirectory(mongodb)
+endif()
+if(demo_qt5)
+    add_subdirectory(qt5)
+endif()
