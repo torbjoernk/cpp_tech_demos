@@ -1,8 +1,8 @@
-message(STATUS "Demo: C++ Concepts and Traits Introspection")
+start_demo_dependencies()
 
 # Tick library
 set(Tick_GITHUB_REPO "pfultz2/Tick")
-message(STATUS "  retreiving Github repository: ${Tick_GITHUB_REPO}")
+message(STATUS "  Github repository: ${Tick_GITHUB_REPO}")
 
 ExternalProject_Add(
   Tick
@@ -24,4 +24,4 @@ ExternalProject_Add(
 )
 
 set(Tick_INCLUDE "${3RDPARTY_ROOT_PATH}/Source/Tick"
-    CACHE STRING "Tick trait introspection and concepts library")
+  CACHE STRING "Tick trait introspection and concepts library")

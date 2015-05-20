@@ -4,8 +4,10 @@ project(cpp_tech_demo
   LANGUAGES C CXX
 )
 
+list(APPEND CMAKE_MODULE_PATH ${cpp_tech_demo_SOURCE_DIR}/cmake)
 include(FeatureSummary)
 include(ExternalProject)
+include(utility_functions)
 
 option(USE_GIT_PROTOCOL "use 'git@host:repo' for 3rd-party libraries instead of 'https://host/repo'" ON)
 
@@ -29,25 +31,10 @@ message(STATUS "----------------------------------------------------------------
 set(3RDPATY_ROOT_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 set_directory_properties(PROPERTIES EP_BASE ${3RDPATY_ROOT_PATH})
 add_subdirectory(3rdparty)
-message(STATUS "")
 
-if(DEMO_STD)
-  message(STATUS "-------------------------------------------------------------------------------")
-  add_subdirectory(std)
-  message(STATUS "")
-endif()
-
-if(DEMO_CONCEPTS)
-  message(STATUS "-------------------------------------------------------------------------------")
-  add_subdirectory(concepts)
-  message(STATUS "")
-endif()
-
-if(DEMO_QT5)
-  message(STATUS "-------------------------------------------------------------------------------")
-  add_subdirectory(qt5)
-  message(STATUS "")
-endif()
+add_demo("Standard C++(03/11/14/17)" "std" DEMO_STD)
+add_demo("C++ Concepts and Traits Introspection" "concepts" DEMO_CONCEPTS)
+add_demo("Qt5" "qt5" DEMO_QT5)
 
 message(STATUS "-------------------------------------------------------------------------------")
 feature_summary(WHAT ALL)
