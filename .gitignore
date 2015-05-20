@@ -1,3 +1,10 @@
+# repository specific excludes
+3rdparty/*
+!3rdparty/CMakeLists.txt
+build/
+build*/
+
+
 # Created by https://www.gitignore.io
 
 ### C ###
