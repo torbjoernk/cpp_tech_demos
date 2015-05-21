@@ -4,28 +4,35 @@
 using namespace std;
 
 
-namespace policies
+namespace mixins
 {
   template<typename>
-  class NotCommunicateable
+  struct NotCommunicateable
   {
-    public:
-      typedef void value_type;
-
-      virtual void send() {};
-      virtual void recv() {};
+    typedef void value_type;
+    virtual void send() { cout << "NotCommunicatable::send()" << endl; }
+    virtual void recv() { cout << "NotCommunicatable::recv()" << endl; }
   };
 
   template<
     typename ValueT
   >
-  class Communicateable
+  struct Communicateable
   {
-    public:
-      typedef ValueT value_type;
+    typedef ValueT value_type;
+    virtual void send() { cout << "Communicatable::send()" << endl; }
+    virtual void recv() { cout << "Communicatable::recv()" << endl; }
+  };
 
-      virtual void send() { cout << "Communicatable::send()" << endl; }
-      virtual void recv() { cout << "Communicatable::recv()" << endl; }
+  template<
+    typename ValueT
+  >
+  struct SpecialCommunicateable
+    : Communicateable<ValueT>
+  {
+    typedef ValueT value_type;
+    virtual void send() { cout << "SpecialCommunicatable::send()" << endl; }
+    virtual void recv() { cout << "SpecialCommunicatable::recv()" << endl; }
   };
 }
 
@@ -40,7 +47,7 @@ namespace traits
   };
 
   template<typename ValueT>
-  struct is_communicateable<policies::Communicateable<ValueT>>
+  struct is_communicateable<mixins::Communicateable<ValueT>>
   {
     static const bool value = true;
     typedef integral_constant<bool, value> type;
@@ -50,11 +57,12 @@ namespace traits
   struct communicateable_trait
   {
     using value_type = typename CommT::value_type;
-    using valid_comm = typename is_communicateable<CommT>::type;
+    using valid_comm_trait = is_communicateable<CommT>;
   };
 }
 
-static_assert(is_same<double, typename traits::communicateable_trait<policies::Communicateable<double>>::value_type>::value,
+
+static_assert(is_same<double, typename traits::communicateable_trait<mixins::Communicateable<double>>::value_type>::value,
               "");
 
 
@@ -62,11 +70,20 @@ template<
   typename ValueT,
   template<
     typename
-  > class CommunicatorT = policies::NotCommunicateable,
+  > class CommunicateableT = mixins::NotCommunicateable,
   typename... Ts
 >
 class Encapsulation
-  : public CommunicatorT<ValueT>
+  : public CommunicateableT<ValueT>
+{};
+
+
+template<
+  typename ValueT,
+  typename... Ts
+>
+class SpecialEncapsulation
+  : public Encapsulation<ValueT, mixins::SpecialCommunicateable, Ts...>
 {};
 
 
@@ -76,7 +93,11 @@ int main(int argn, char** argv)
   default_comm.send();
   default_comm.recv();
 
-  Encapsulation<double, policies::Communicateable> custom_comm;
+  Encapsulation<double, mixins::Communicateable> custom_comm;
   custom_comm.send();
   custom_comm.recv();
+
+  SpecialEncapsulation<double> special;
+  special.send();
+  special.recv();
 }
