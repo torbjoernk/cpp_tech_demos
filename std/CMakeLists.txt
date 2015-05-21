@@ -6,6 +6,7 @@ set(EXAMPLES
   inheritance
   mixins
   template_inherit
+  static_poly
 )
 
 foreach(example ${EXAMPLES})
