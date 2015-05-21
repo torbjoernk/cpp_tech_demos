@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(cpp_tech_demo
   VERSION 0.0.1
-  LANGUAGES C CXX
+  LANGUAGES CXX
 )
 
 list(APPEND CMAKE_MODULE_PATH ${cpp_tech_demo_SOURCE_DIR}/cmake)
@@ -20,6 +20,11 @@ option(DEMO_CONCEPTS "enable C++ concepts demo"           OFF)
 add_feature_info(DEMO_CONCEPTS
   DEMO_CONCEPTS
   "Demos for concepts and traits introspection provided by external libraries."
+)
+option(DEMO_MPI "enable MPI demos"                        OFF)
+add_feature_info(DEMO_MPI
+  DEMO_MPI
+  "Demos for MPI communication with C++ either through native C interface or 3rd-party C++ bindings."
 )
 option(DEMO_QT5      "enable Qt5 demo"                    OFF)
 add_feature_info(DEMO_QT5
@@ -40,6 +45,7 @@ add_subdirectory(3rdparty)
 
 add_demo("Standard C++(03/11/14/17)" "std" DEMO_STD)
 add_demo("C++ Concepts and Traits Introspection" "concepts" DEMO_CONCEPTS)
+add_demo("MPI Examples of multiple scale" "mpi" DEMO_MPI)
 add_demo("Qt5" "qt5" DEMO_QT5)
 
 add_demo("Documentation" "docs" DOCS)

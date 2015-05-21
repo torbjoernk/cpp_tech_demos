@@ -14,3 +14,11 @@ endmacro()
 macro(END_DEMO_DEPENDENCIES)
   message(STATUS "")
 endmacro()
+
+macro(START_DEMO_TARGETS)
+  message(STATUS "Configuring Targets")
+endmacro()
+
+macro(MESSAGE_DEMO_TARGET _name)
+  message(STATUS "  ${_name}")
+endmacro()
