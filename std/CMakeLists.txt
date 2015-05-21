@@ -17,5 +17,5 @@ foreach(example ${EXAMPLES})
     CXX_STANDARD_REQUIRED TRUE
   )
 
-  message_demo_target(${example})
+  add_demo_target(${example})
 endforeach(example)

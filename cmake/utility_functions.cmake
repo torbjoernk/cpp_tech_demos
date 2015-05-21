@@ -19,6 +19,10 @@ macro(START_DEMO_TARGETS)
   message(STATUS "Configuring Targets")
 endmacro()
 
-macro(MESSAGE_DEMO_TARGET _name)
-  message(STATUS "  ${_name}")
+macro(ADD_DEMO_TARGET _name)
+  message(STATUS "  ${_name} - run with 'run_${_name}'")
+  add_custom_target(run_${_name}
+    COMMAND ${_name}
+    DEPENDS ${_name}
+  )
 endmacro()
