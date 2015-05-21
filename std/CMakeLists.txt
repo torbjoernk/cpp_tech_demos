@@ -4,6 +4,7 @@ start_demo_targets()
 set(EXAMPLES
   exceptions
   inheritance
+  mixins
   template_inherit
 )
 

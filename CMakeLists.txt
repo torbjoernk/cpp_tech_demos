@@ -39,8 +39,8 @@ add_feature_info(DOCS
 )
 
 message(STATUS "-------------------------------------------------------------------------------")
-set(3RDPATY_ROOT_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
-set_directory_properties(PROPERTIES EP_BASE ${3RDPATY_ROOT_PATH})
+set(3RDPARTY_ROOT_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
+set_directory_properties(PROPERTIES EP_BASE ${3RDPARTY_ROOT_PATH})
 add_subdirectory(3rdparty)
 
 add_demo("Standard C++(03/11/14/17)" "std" DEMO_STD)

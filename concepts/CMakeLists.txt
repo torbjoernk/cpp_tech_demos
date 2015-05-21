@@ -25,3 +25,29 @@ ExternalProject_Add(
 
 set(Tick_INCLUDE "${3RDPARTY_ROOT_PATH}/Source/Tick"
   CACHE STRING "Tick trait introspection and concepts library")
+
+end_demo_dependencies()
+start_demo_targets()
+
+set(EXAMPLES
+  temp_start
+)
+
+foreach(example ${EXAMPLES})
+  include_directories(${Tick_INCLUDE})
+
+  add_executable(${example}
+    ${example}.cpp
+  )
+
+  set_target_properties(${example} PROPERTIES
+    CXX_STANDARD "11"
+    CXX_STANDARD_REQUIRED TRUE
+  )
+
+  add_dependencies(${example}
+    Tick
+  )
+
+  add_demo_target(${example})
+endforeach(example)
