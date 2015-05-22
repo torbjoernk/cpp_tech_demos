@@ -66,7 +66,7 @@ namespace traits
     static const bool value = false;
     typedef integral_constant<bool, value> type;
   };
-  
+
   template<typename ValueT>
   struct is_communicateable<mixins::Communicateable<ValueT>>
   {
@@ -91,12 +91,11 @@ namespace traits
 
 
 template<
-  class EncapT,
-  typename... Ts
+  class EncapT
 >
 class EncapManager
 {
-  
+  typedef typename traits::encapsulation_trait<EncapT> encap_traits;
 };
 
 

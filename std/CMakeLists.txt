@@ -21,3 +21,4 @@ foreach(example ${EXAMPLES})
 
   add_demo_target(${example})
 endforeach(example)
+
