@@ -130,8 +130,7 @@ void update_state(ProcessData &data, const PState &new_state, const int iter=-1)
 
   if (data.size > 1) {
     VLOG(5) << "locking local state window";
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.state_win); assert(mpi_err == MPI_SUCCESS);
   }
 
   data.state.state = new_state;
@@ -140,8 +139,7 @@ void update_state(ProcessData &data, const PState &new_state, const int iter=-1)
   }
 
   if (data.size > 1) {
-    mpi_err = MPI_Win_unlock(data.rank, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.rank, data.state_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked local state window";
   }
 }
@@ -154,15 +152,12 @@ void doing_pre_fine(ProcessData &data) {
 
   if (data.size > 1 && !data.iam_first) {
     VLOG(5) << "locking fine window to rank " << data.prev;
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.fine_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.fine_win); assert(mpi_err == MPI_SUCCESS);
 
     VLOG(4) << "getting fine value from " << data.prev;
-    mpi_err = MPI_Get(&(data.fine_val_in), 1, MPI_DOUBLE, data.prev, 0, 1, MPI_DOUBLE, data.fine_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Get(&(data.fine_val_in), 1, MPI_DOUBLE, data.prev, 0, 1, MPI_DOUBLE, data.fine_win); assert(mpi_err == MPI_SUCCESS);
 
-    mpi_err = MPI_Win_unlock(data.prev, data.fine_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.prev, data.fine_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked fine window to rank " << data.prev;
   }
 }
@@ -191,15 +186,13 @@ void doing_post_fine(ProcessData &data) {
 
   if (data.size > 1) {
     VLOG(5) << "locking local fine window";
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.fine_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.fine_win); assert(mpi_err == MPI_SUCCESS);
   }
 
   data.fine_val_out = data.fine_val;
 
   if (data.size > 1) {
-    mpi_err = MPI_Win_unlock(data.rank, data.fine_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.rank, data.fine_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked local fine window";
   }
 }
@@ -212,15 +205,12 @@ void doing_pre_coarse(ProcessData &data) {
 
   if (data.size > 1 && !data.iam_first) {
     VLOG(5) << "locking coarse window to rank " << data.prev;
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.coarse_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.coarse_win); assert(mpi_err == MPI_SUCCESS);
 
     VLOG(4) << "getting coarse value from " << data.prev;
-    mpi_err = MPI_Get(&(data.coarse_val_in), 1, MPI_DOUBLE, data.prev, 0, 1, MPI_DOUBLE, data.coarse_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Get(&(data.coarse_val_in), 1, MPI_DOUBLE, data.prev, 0, 1, MPI_DOUBLE, data.coarse_win); assert(mpi_err == MPI_SUCCESS);
 
-    mpi_err = MPI_Win_unlock(data.prev, data.coarse_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.prev, data.coarse_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked coarse window to rank " << data.prev;
   }
 }
@@ -249,15 +239,13 @@ void doing_post_coarse(ProcessData &data) {
 
   if (data.size > 1) {
     VLOG(5) << "locking local coarse window";
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.coarse_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.coarse_win); assert(mpi_err == MPI_SUCCESS);
   }
 
   data.coarse_val_out = data.coarse_val;
 
   if (data.size > 1) {
-    mpi_err = MPI_Win_unlock(data.rank, data.coarse_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.rank, data.coarse_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked local coarse window";
   }
 }
@@ -269,15 +257,12 @@ void check_finished(ProcessData &data, const int iter) {
 
   if (data.size > 1 && !data.iam_first) {
     VLOG(5) << "locking state window to rank " << data.prev;
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.state_win); assert(mpi_err == MPI_SUCCESS);
 
     VLOG(4) << "getting state from " << data.prev;
-    mpi_err = MPI_Get(&other_state, 1, process_state_type, data.prev, 0, 1, process_state_type, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Get(&other_state, 1, process_state_type, data.prev, 0, 1, process_state_type, data.state_win); assert(mpi_err == MPI_SUCCESS);
 
-    mpi_err = MPI_Win_unlock(data.prev, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.prev, data.state_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked state window to rank " << data.prev;
   } else {
     other_state.state = PState::CONVERGED;
@@ -285,27 +270,20 @@ void check_finished(ProcessData &data, const int iter) {
 
   if (data.size > 1) {
     VLOG(5) << "locking local state window";
-    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.rank, 0, data.state_win); assert(mpi_err == MPI_SUCCESS);
   }
 
   double curr_time = MPI_Wtime();
   data.state.residual = curr_time - data.mpi_start;
 
-  switch (other_state.state) {
-    case PState::FAILED:
+  if (other_state.state == PState::FAILED) {
       data.state.state = PState::FAILED;
-      break;
-    case PState::CONVERGED:
-      if (data.state.residual > RESIDUAL_TOL) {
-        data.state.state = PState::CONVERGED;
-      }
-      break;
+  } else if (other_state.state == PState::CONVERGED && data.state.residual > RESIDUAL_TOL) {
+    data.state.state = PState::CONVERGED;
   }
 
   if (data.size > 1) {
-    mpi_err = MPI_Win_unlock(data.rank, data.state_win);
-    assert(mpi_err == MPI_SUCCESS);
+    mpi_err = MPI_Win_unlock(data.rank, data.state_win); assert(mpi_err == MPI_SUCCESS);
     VLOG(5) << "unlocked local state window";
   }
 }
@@ -323,6 +301,8 @@ int main(int argn, char** argv) {
   int rank = -1;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  assert(size <= TOTAL_STEPS);
 
   MPI_Type_create_struct(3, block_length, block_displace, block_types, &process_state_type);
   MPI_Type_commit(&process_state_type);
@@ -377,7 +357,7 @@ int main(int argn, char** argv) {
     }
 
     VLOG(4) << "broadcasting final value to all";
-    MPI_Bcast(&(myself.fine_val_out), 1, MPI_DOUBLE, working_size - 1, MPI_COMM_WORLD);
+    mpi_err = MPI_Bcast(&(myself.fine_val_out), 1, MPI_DOUBLE, working_size - 1, MPI_COMM_WORLD); assert(mpi_err == MPI_SUCCESS);
     initial_value = myself.fine_val_out;
 
     curr_step_start += size;
