@@ -29,7 +29,11 @@ set(executables
   split_comms
 )
 if(${Boost_FOUND})
-  list(APPEND executables simple_comm simple_comm_rma)
+  list(APPEND executables
+    simple_comm
+    simple_comm_rma_get
+    simple_comm_rma_get_split
+  )
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
 

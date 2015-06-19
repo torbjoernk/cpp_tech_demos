@@ -110,8 +110,17 @@ inline static void add_custom_logger(const string& id)
   el::Loggers::reconfigureLogger(logger, *conf);
 }
 
-inline static void init_log()
+inline static void init_log(int argn, char** argv)
 {
+  START_EASYLOGGINGPP(argn, argv);
+
+  el::Loggers::addFlag(el::LoggingFlag::LogDetailedCrashReason);
+  el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
+  el::Loggers::addFlag(el::LoggingFlag::MultiLoggerSupport);
+  el::Loggers::addFlag(el::LoggingFlag::CreateLoggerAutomatically);
+  el::Loggers::addFlag(el::LoggingFlag::ImmediateFlush);
+  el::Loggers::removeFlag(el::LoggingFlag::ColoredTerminalOutput);
+
   el::Configurations defaultConf;
   defaultConf.setToDefault();
 
