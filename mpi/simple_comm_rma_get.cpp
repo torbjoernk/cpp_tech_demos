@@ -241,15 +241,10 @@ void check_finished(ProcessData &data, const int iter) {
   double curr_time = MPI_Wtime();
   data.state.residual = curr_time - data.mpi_start;
 
-  switch (other_state.state) {
-    case PState::FAILED:
+  if (other_state.state == PState::FAILED) {
       data.state.state = PState::FAILED;
-      break;
-    case PState::CONVERGED:
-      if (data.state.residual > RESIDUAL_TOL) {
-        data.state.state = PState::CONVERGED;
-      }
-      break;
+  } else if (other_state.state == PState::CONVERGED && data.state.residual > RESIDUAL_TOL) {
+    data.state.state = PState::CONVERGED;
   }
 
   if (data.size > 1) {
