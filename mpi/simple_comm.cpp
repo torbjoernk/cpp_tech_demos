@@ -31,8 +31,8 @@ inline static MPI_Status MPI_Status_factory()
 #define MAX_ITER                 5
 #define BASE_DELAY            1000  // nanoseconds
 #define FINE_MULTIPLIER     100000
-#define COARSE_MULTIPLIER        1
-#define STATE_MULTIPLIER       100
+#define COARSE_MULTIPLIER      100
+#define STATE_MULTIPLIER        10
 
 #define TOTAL_STEPS              4
 #define RESIDUAL_TOL             2  // seconds
