@@ -89,7 +89,7 @@ struct ProcessData
   MPI_Status coarse_stat;
   MPI_Request state_req;
   MPI_Request fine_req;
-  MPI_Request coarse_req;
+//   MPI_Request coarse_req;
 
   ~ProcessData()
   {
@@ -110,7 +110,7 @@ struct ProcessData
     this->coarse_stat = MPI_Status_factory();
     this->state_req = MPI_REQUEST_NULL;
     this->fine_req = MPI_REQUEST_NULL;
-    this->coarse_req = MPI_REQUEST_NULL;
+//     this->coarse_req = MPI_REQUEST_NULL;
   }
 };
 
@@ -179,12 +179,12 @@ void doing_coarse(ProcessData &data, const int iter) {
 
   if (!data.iam_last) {
     VLOG(5) << "sending coarse data to " << data.next << " with tag " << coarse_tag(iter);
-    if (data.coarse_req != MPI_REQUEST_NULL) {
-      mpi_err = MPI_Wait(&(data.coarse_req), &(data.coarse_stat));
-      assert(mpi_err == MPI_SUCCESS);
-    }
-    mpi_err = MPI_Isend(&(data.coarse_val), 1, MPI_DOUBLE, data.next, coarse_tag(iter),
-                        MPI_COMM_WORLD, &(data.coarse_req));
+//     if (data.coarse_req != MPI_REQUEST_NULL) {
+//       mpi_err = MPI_Wait(&(data.coarse_req), &(data.coarse_stat));
+//       assert(mpi_err == MPI_SUCCESS);
+//     }
+    mpi_err = MPI_Send(&(data.coarse_val), 1, MPI_DOUBLE, data.next, coarse_tag(iter),
+                       MPI_COMM_WORLD);
     assert(mpi_err == MPI_SUCCESS);
   }
 }
@@ -282,10 +282,10 @@ int main(int argn, char** argv) {
       mpi_err = MPI_Wait(&(myself.state_req), &(myself.coarse_stat));
       assert(mpi_err == MPI_SUCCESS);
     }
-    if (myself.coarse_req != MPI_REQUEST_NULL) {
-      mpi_err = MPI_Wait(&(myself.coarse_req), &(myself.coarse_stat));
-      assert(mpi_err == MPI_SUCCESS);
-    }
+//     if (myself.coarse_req != MPI_REQUEST_NULL) {
+//       mpi_err = MPI_Wait(&(myself.coarse_req), &(myself.coarse_stat));
+//       assert(mpi_err == MPI_SUCCESS);
+//     }
     if (myself.fine_req != MPI_REQUEST_NULL) {
       mpi_err = MPI_Wait(&(myself.fine_req), &(myself.fine_stat));
       assert(mpi_err == MPI_SUCCESS);
