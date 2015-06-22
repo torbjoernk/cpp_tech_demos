@@ -20,8 +20,8 @@ boost::format log_fmt;
 
 #define MAX_ITER                 5
 #define BASE_DELAY            1000  // nanoseconds
-#define FINE_MULTIPLIER     100000
-#define COARSE_MULTIPLIER      100
+#define FINE_MULTIPLIER     500000
+#define COARSE_MULTIPLIER    10000
 #define STATE_MULTIPLIER        10
 
 #define TOTAL_STEPS              4
