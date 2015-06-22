@@ -123,7 +123,8 @@ void doing_fine(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
   if (!data.iam_first && iter > 0) {
-    mpi_err = MPI_Recv(&(data.fine_val), 1, MPI_DOUBLE, data.prev, fine_tag(iter),
+    VLOG(5) << "receiving fine data from " << data.prev << " with tag " << fine_tag(iter - 1);
+    mpi_err = MPI_Recv(&(data.fine_val), 1, MPI_DOUBLE, data.prev, fine_tag(iter - 1),
                        MPI_COMM_WORLD, &(data.fine_stat));
     assert(mpi_err == MPI_SUCCESS);
   }
@@ -142,6 +143,7 @@ void doing_fine(ProcessData &data, const int iter) {
   VLOG(2) << "done computation";
 
   if (!data.iam_last) {
+    VLOG(5) << "sending fine data to " << data.next << " with tag " << fine_tag(iter);
     if (data.fine_req != MPI_REQUEST_NULL) {
       mpi_err = MPI_Wait(&(data.fine_req), &(data.fine_stat));
       assert(mpi_err == MPI_SUCCESS);
@@ -155,8 +157,9 @@ void doing_fine(ProcessData &data, const int iter) {
 void doing_coarse(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
-  if (!data.iam_first) {
-    mpi_err = MPI_Recv(&(data.coarse_val), 1, MPI_DOUBLE, data.prev, coarse_tag(iter),
+  if (!data.iam_first && iter > 0) {
+    VLOG(5) << "receiving coarse data from " << data.prev << " with tag " << coarse_tag(iter - 1);
+    mpi_err = MPI_Recv(&(data.coarse_val), 1, MPI_DOUBLE, data.prev, coarse_tag(iter - 1),
                        MPI_COMM_WORLD, &(data.coarse_stat));
     assert(mpi_err == MPI_SUCCESS);
   }
@@ -175,6 +178,7 @@ void doing_coarse(ProcessData &data, const int iter) {
   VLOG(2) << "done computation";
 
   if (!data.iam_last) {
+    VLOG(5) << "sending coarse data to " << data.next << " with tag " << coarse_tag(iter);
     if (data.coarse_req != MPI_REQUEST_NULL) {
       mpi_err = MPI_Wait(&(data.coarse_req), &(data.coarse_stat));
       assert(mpi_err == MPI_SUCCESS);
@@ -190,12 +194,10 @@ void check_finished(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
   ProcessState other_state;
 
-  if (!data.iam_first) {
-    mpi_err = MPI_Recv(&other_state, 1, process_state_type, data.prev, state_tag(iter),
+  if (!data.iam_first && iter > 0) {
+    mpi_err = MPI_Recv(&other_state, 1, process_state_type, data.prev, state_tag(iter - 1),
                        MPI_COMM_WORLD, &(data.state_stat));
     assert(mpi_err == MPI_SUCCESS);
-
-    assert(other_state.iter == iter);
   } else {
     other_state.state = PState::CONVERGED;
   }
@@ -206,11 +208,13 @@ void check_finished(ProcessData &data, const int iter) {
   if (other_state.state == PState::FAILED) {
       data.state.state = PState::FAILED;
   } else if (other_state.state == PState::CONVERGED && data.state.residual > RESIDUAL_TOL) {
+    VLOG(2) << "previous converged and I'm also done";
     data.state.state = PState::CONVERGED;
   }
 
   if (!data.iam_last) {
     if (data.state_req != MPI_REQUEST_NULL) {
+      LOG(DEBUG) << "cancelling previous state send";
       mpi_err = MPI_Cancel(&(data.state_req));
       assert(mpi_err == MPI_SUCCESS);
 
