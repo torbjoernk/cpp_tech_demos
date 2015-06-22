@@ -34,13 +34,30 @@ inline static MPI_Status MPI_Status_factory()
 #define COARSE_MULTIPLIER        1
 #define STATE_MULTIPLIER       100
 
-#define TOTAL_STEPS              6
-#define RESIDUAL_TOL             5  // seconds
+#define TOTAL_STEPS              4
+#define RESIDUAL_TOL             2  // seconds
 
+
+enum class PState : int {
+  // overall state
+  CONVERGED        =  0,
+  FAILED           =  1,
+  // iterating states
+  PREDICT          = 10,
+  PRE_ITER_COARSE  = 20,
+  ITER_COARSE      = 21,
+  POST_ITER_COARSE = 22,
+  PRE_ITER_FINE    = 30,
+  ITER_FINE        = 31,
+  POST_ITER_FINE   = 32,
+
+  // last
+  UNKNOWN          = 99,
+};
 
 struct ProcessState
 {
-  int finished = (int)false;
+  PState state= PState::UNKNOWN;
   int iter = -1;
   double residual = numeric_limits<double>::max();
 };
@@ -56,6 +73,7 @@ MPI_Datatype block_types[3] = {
 };
 
 MPI_Datatype process_state_type;
+int process_state_type_size;
 
 
 struct ProcessData
@@ -111,7 +129,7 @@ void doing_fine(ProcessData &data, const int iter) {
     assert(mpi_err == MPI_SUCCESS);
   }
 
-  data.fine_val += (data.rank + 1) * FINE_MULTIPLIER;
+  data.fine_val += (data.state.iter + 1) * FINE_MULTIPLIER + iter * 0.001;
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
@@ -141,7 +159,7 @@ void doing_coarse(ProcessData &data, const int iter) {
     assert(mpi_err == MPI_SUCCESS);
   }
 
-  data.coarse_val += (data.rank + 1) * COARSE_MULTIPLIER;
+  data.coarse_val += (data.state.iter + 1) * COARSE_MULTIPLIER + iter * 0.001;
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
@@ -174,12 +192,17 @@ void check_finished(ProcessData &data, const int iter) {
 
     assert(other_state.iter == iter);
   } else {
-    other_state.finished = true;
+    other_state.state = PState::CONVERGED;
   }
 
   double curr_time = MPI_Wtime();
   data.state.residual = curr_time - data.mpi_start;
-  data.state.finished = ((data.state.residual > RESIDUAL_TOL) && other_state.finished);
+
+  if (other_state.state == PState::FAILED) {
+      data.state.state = PState::FAILED;
+  } else if (other_state.state == PState::CONVERGED && data.state.residual > RESIDUAL_TOL) {
+    data.state.state = PState::CONVERGED;
+  }
 
   if (!data.iam_last) {
     if (data.state_req != MPI_REQUEST_NULL) {
@@ -202,7 +225,7 @@ int main(int argn, char** argv) {
 
   MPI_Init(&argn, &argv);
 
-  init_log();
+  init_log(argn, argv);
 
   int size = -1;
   int rank = -1;
@@ -235,7 +258,7 @@ int main(int argn, char** argv) {
     }
     myself.init(mpi_start);
 
-    for(int iter = 0; !myself.state.finished; ++iter) {
+    for(int iter = 0; myself.state.state > PState::FAILED; ++iter) {
       myself.state.iter = iter;
       doing_coarse(myself, iter);
       doing_fine(myself, iter);
