@@ -120,7 +120,7 @@ static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
 void doing_fine(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
-  if (data.size > 1 && !data.iam_first) {
+  if (data.size > 1 && !data.iam_first && iter > 0) {
     VLOG(5) << "locking fine window to rank " << data.prev;
     mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.fine_win);
     assert(mpi_err == MPI_SUCCESS);
@@ -163,7 +163,7 @@ void doing_fine(ProcessData &data, const int iter) {
 void doing_coarse(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
-  if (data.size > 1 && !data.iam_first) {
+  if (data.size > 1 && !data.iam_first && iter > 0) {
     VLOG(5) << "locking coarse window to rank " << data.prev;
     mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.coarse_win);
     assert(mpi_err == MPI_SUCCESS);
