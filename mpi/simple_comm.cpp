@@ -115,7 +115,7 @@ struct ProcessData
 };
 
 static int fine_tag(const int iter)   { return (iter + 1) * FINE_MULTIPLIER; }
-static int coarse_tag(const int iter) { return (iter + 1) * COARSE_MULTIPLIER; }
+static int coarse_tag(const int iter) { return (iter + 1) * (COARSE_MULTIPLIER / 10); }
 static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
 
 
@@ -157,9 +157,9 @@ void doing_fine(ProcessData &data, const int iter) {
 void doing_coarse(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
-  if (!data.iam_first && iter > 0) {
-    VLOG(5) << "receiving coarse data from " << data.prev << " with tag " << coarse_tag(iter - 1);
-    mpi_err = MPI_Recv(&(data.coarse_val), 1, MPI_DOUBLE, data.prev, coarse_tag(iter - 1),
+  if (!data.iam_first) {
+    VLOG(5) << "receiving coarse data from " << data.prev << " with tag " << coarse_tag(iter);
+    mpi_err = MPI_Recv(&(data.coarse_val), 1, MPI_DOUBLE, data.prev, coarse_tag(iter),
                        MPI_COMM_WORLD, &(data.coarse_stat));
     assert(mpi_err == MPI_SUCCESS);
   }
@@ -265,7 +265,7 @@ int main(int argn, char** argv) {
       myself.coarse_val = initial_value / FINE_MULTIPLIER;
       LOG(INFO) << "inital values:\tcoarse=" << std::fixed << std::setprecision(3) << myself.coarse_val << "\tfine=" << myself.fine_val;
 
-      for(int iter = 0; myself.state.state > PState::FAILED; ++iter) {
+      for(int iter = 0; iter < 5 /*myself.state.state > PState::FAILED*/; ++iter) {
         myself.state.iter = iter;
         doing_coarse(myself, iter);
         doing_fine(myself, iter);
