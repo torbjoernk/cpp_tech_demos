@@ -17,15 +17,7 @@ boost::format log_fmt;
 #define WITH_MPI
 #include "../logging.hpp"
 
-
-#define MAX_ITER                 5
-#define BASE_DELAY            1000  // nanoseconds
-#define FINE_MULTIPLIER     500000
-#define COARSE_MULTIPLIER    10000
-#define STATE_MULTIPLIER        10
-
-#define TOTAL_STEPS              4
-#define RESIDUAL_TOL             2  // seconds
+#include "simple_comm_config.hpp"
 
 
 enum class PState : int {
@@ -150,7 +142,7 @@ void doing_fine(ProcessData &data, const int iter) {
 
   VLOG(2) << "start computation";
   data.fine_val_out = data.fine_val_in + (data.state.iter + 1) * FINE_MULTIPLIER + iter * 0.001;
-  VLOG(3) << data.fine_val_out << " = " << data.fine_val_in << " + " << ((data.rank + 1) * FINE_MULTIPLIER) << " + " << (iter * 0.001);
+  VLOG(3) << data.fine_val_out << " = " << data.fine_val_in << " + " << ((data.state.iter + 1) * FINE_MULTIPLIER) << " + " << (iter * 0.001);
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;

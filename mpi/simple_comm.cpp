@@ -17,6 +17,8 @@ boost::format log_fmt;
 #define WITH_MPI
 #include "../logging.hpp"
 
+#include "simple_comm_config.hpp"
+
 
 inline static MPI_Status MPI_Status_factory()
 {
@@ -26,16 +28,6 @@ inline static MPI_Status MPI_Status_factory()
   stat.MPI_TAG = MPI_ANY_TAG;
   return stat;
 }
-
-
-#define MAX_ITER                 5
-#define BASE_DELAY            1000  // nanoseconds
-#define FINE_MULTIPLIER     500000
-#define COARSE_MULTIPLIER    10000
-#define STATE_MULTIPLIER        10
-
-#define TOTAL_STEPS              4
-#define RESIDUAL_TOL             2  // seconds
 
 
 enum class PState : int {
@@ -99,6 +91,13 @@ struct ProcessData
   MPI_Request fine_req;
   MPI_Request coarse_req;
 
+  ~ProcessData()
+  {
+    LOG(DEBUG) << "destructing ProcessData";
+    int mpi_err = MPI_SUCCESS;
+
+  }
+
   void init(const double start_time) {
     assert(rank >= 0 && size > 0);
     this->mpi_start = start_time;
@@ -123,13 +122,15 @@ static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
 void doing_fine(ProcessData &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
-  if (!data.iam_first) {
+  if (!data.iam_first && iter > 0) {
     mpi_err = MPI_Recv(&(data.fine_val), 1, MPI_DOUBLE, data.prev, fine_tag(iter),
                        MPI_COMM_WORLD, &(data.fine_stat));
     assert(mpi_err == MPI_SUCCESS);
   }
 
+  VLOG(2) << "start computation";
   data.fine_val += (data.state.iter + 1) * FINE_MULTIPLIER + iter * 0.001;
+  VLOG(3) << data.fine_val << " = " << data.fine_val << " + " << ((data.state.iter + 1) * FINE_MULTIPLIER) << " + " << (iter * 0.001);
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
@@ -138,6 +139,7 @@ void doing_fine(ProcessData &data, const int iter) {
     end = Clock::now();
     duration = end - start;
   } while(duration.count() < BASE_DELAY * FINE_MULTIPLIER);
+  VLOG(2) << "done computation";
 
   if (!data.iam_last) {
     if (data.fine_req != MPI_REQUEST_NULL) {
@@ -159,7 +161,9 @@ void doing_coarse(ProcessData &data, const int iter) {
     assert(mpi_err == MPI_SUCCESS);
   }
 
+  VLOG(2) << "start computation";
   data.coarse_val += (data.state.iter + 1) * COARSE_MULTIPLIER + iter * 0.001;
+  VLOG(3) << data.coarse_val << " = " << data.coarse_val << " + " << ((data.state.iter + 1) * COARSE_MULTIPLIER) << " + " << (iter * 0.001);
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
@@ -168,6 +172,7 @@ void doing_coarse(ProcessData &data, const int iter) {
     end = Clock::now();
     duration = end - start;
   } while(duration.count() < BASE_DELAY * COARSE_MULTIPLIER);
+  VLOG(2) << "done computation";
 
   if (!data.iam_last) {
     if (data.coarse_req != MPI_REQUEST_NULL) {
@@ -236,35 +241,37 @@ int main(int argn, char** argv) {
   MPI_Type_commit(&process_state_type);
 
   int curr_step_start = 0;
+  double initial_value = 1.0;
+  int mpi_err = MPI_SUCCESS;
 
   do {
     double mpi_start = MPI_Wtime();
 
-    int mpi_err = MPI_SUCCESS;
-
     ProcessData myself;
 
     myself.rank = rank;
-    if (curr_step_start + size - 1 < TOTAL_STEPS) {
-      // all ranks fit
-      myself.size = size;
-    } else {
-      if (curr_step_start + rank < TOTAL_STEPS) {
-        myself.size = TOTAL_STEPS - curr_step_start;
-      } else {
-        // this rank hasn't to do anything anymore
-        break;
-      }
-    }
-    myself.init(mpi_start);
+    int working_size = (curr_step_start + size - 1 < TOTAL_STEPS) ? size : TOTAL_STEPS % size;
+    LOG(INFO) << working_size << " processes will work now";
 
-    for(int iter = 0; myself.state.state > PState::FAILED; ++iter) {
-      myself.state.iter = iter;
-      doing_coarse(myself, iter);
-      doing_fine(myself, iter);
-      check_finished(myself, iter);
-      log_fmt % iter % myself.state.residual % myself.coarse_val % myself.fine_val;
-      LOG(INFO) << log_fmt;
+    myself.size = working_size;
+    if (rank < working_size) {
+      LOG(INFO) << "doing step " << (curr_step_start + rank);
+      myself.init(mpi_start);
+      myself.fine_val = initial_value;
+      myself.coarse_val = initial_value / FINE_MULTIPLIER;
+      LOG(INFO) << "inital values:\tcoarse=" << std::fixed << std::setprecision(3) << myself.coarse_val << "\tfine=" << myself.fine_val;
+
+      for(int iter = 0; myself.state.state > PState::FAILED; ++iter) {
+        myself.state.iter = iter;
+        doing_coarse(myself, iter);
+        doing_fine(myself, iter);
+        check_finished(myself, iter);
+        log_fmt % iter % myself.state.residual % myself.coarse_val % myself.fine_val;
+        LOG(INFO) << log_fmt;
+      }
+    } else {
+      // this rank hasn't to do anything anymore
+      LOG(WARNING) << "hasn't work anymore";
     }
 
     if (myself.state_req != MPI_REQUEST_NULL) {
@@ -280,9 +287,15 @@ int main(int argn, char** argv) {
       assert(mpi_err == MPI_SUCCESS);
     }
 
+    VLOG(4) << "broadcasting final value to all";
+    mpi_err = MPI_Bcast(&(myself.fine_val), 1, MPI_DOUBLE, working_size - 1, MPI_COMM_WORLD);
+    assert(mpi_err == MPI_SUCCESS);
+    initial_value = myself.fine_val;
+
     curr_step_start += size;
   } while (curr_step_start < TOTAL_STEPS);
 
   MPI_Type_free(&process_state_type);
+  VLOG(6) << "finalizing";
   MPI_Finalize();
 }

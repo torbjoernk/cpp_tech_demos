@@ -17,15 +17,7 @@ boost::format log_fmt;
 #define WITH_MPI
 #include "../logging.hpp"
 
-
-#define MAX_ITER                 5
-#define BASE_DELAY            1000  // nanoseconds
-#define FINE_MULTIPLIER     500000
-#define COARSE_MULTIPLIER    10000
-#define STATE_MULTIPLIER        10
-
-#define TOTAL_STEPS              4
-#define RESIDUAL_TOL             2  // seconds
+#include "simple_comm_config.hpp"
 
 
 enum class PState : int {
