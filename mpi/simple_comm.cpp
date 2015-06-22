@@ -214,9 +214,9 @@ void check_finished(ProcessData &data, const int iter) {
 
   if (!data.iam_last) {
     if (data.state_req != MPI_REQUEST_NULL) {
-      LOG(DEBUG) << "cancelling previous state send";
-      mpi_err = MPI_Cancel(&(data.state_req));
-      assert(mpi_err == MPI_SUCCESS);
+//       LOG(DEBUG) << "cancelling previous state send";
+//       mpi_err = MPI_Cancel(&(data.state_req));
+//       assert(mpi_err == MPI_SUCCESS);
 
       mpi_err = MPI_Wait(&(data.state_req), &(data.state_stat));
       assert(mpi_err == MPI_SUCCESS);
