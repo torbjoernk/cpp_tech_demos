@@ -55,10 +55,6 @@ struct ProcessData
   }
 };
 
-static int fine_tag(const int iter)   { return (iter + 1) * FINE_MULTIPLIER; }
-static int coarse_tag(const int iter) { return (iter + 1) * COARSE_MULTIPLIER; }
-static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
-
 
 void update_state(ProcessData &data, const PState &new_state, const int iter=-1) {
   int mpi_err = MPI_SUCCESS;
@@ -138,7 +134,7 @@ void doing_pre_coarse(ProcessData &data) {
 
   int mpi_err = MPI_SUCCESS;
 
-  if (data.size > 1 && !data.iam_first) {
+  if (data.size > 1 && !data.iam_first && data.state.iter != - data.rank) {
     VLOG(5) << "locking coarse window to rank " << data.prev;
     mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, data.prev, 0, data.coarse_win); assert(mpi_err == MPI_SUCCESS);
 
