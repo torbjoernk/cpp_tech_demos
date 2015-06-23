@@ -28,16 +28,6 @@ set(executables
   provoke_open_requests
   split_comms
 )
-if(${Boost_FOUND})
-  list(APPEND executables
-    simple_comm
-    simple_comm_rma_get
-    simple_comm_rma_get_split
-    simple_comm_rma_put
-  )
-  include_directories(${Boost_INCLUDE_DIRS})
-endif()
-
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
 foreach(exe ${executables})
@@ -52,3 +42,5 @@ foreach(exe ${executables})
   )
   add_demo_target(${exe})
 endforeach(exe)
+
+add_subdirectory(simple_comm)
