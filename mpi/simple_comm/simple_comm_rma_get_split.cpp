@@ -1,61 +1,4 @@
-#include <cassert>
-#include <sstream>
-#include <iostream>
-#include <iomanip>
-#include <ctime>
-#include <chrono>
-using namespace std;
-
-typedef chrono::system_clock Clock;
-typedef chrono::nanoseconds ClockResolution;
-
-#include <boost/format.hpp>
-boost::format log_fmt;
-
-#include <mpi.h>
-
-#define WITH_MPI
-#include "../logging.hpp"
-
 #include "simple_comm_config.hpp"
-
-
-enum class PState : int {
-  // overall state
-  CONVERGED        =  0,
-  FAILED           =  1,
-  // iterating states
-  ITERATING        = 10,
-  PRE_ITER_COARSE  = 20,
-  ITER_COARSE      = 21,
-  POST_ITER_COARSE = 22,
-  PRE_ITER_FINE    = 30,
-  ITER_FINE        = 31,
-  POST_ITER_FINE   = 32,
-
-  // last
-  UNKNOWN          = 99,
-};
-
-struct ProcessState
-{
-  PState state= PState::UNKNOWN;
-  int iter = -1;
-  double residual = numeric_limits<double>::max();
-};
-
-int block_length[3] = {1, 1, 1};
-MPI_Aint block_displace[3] = {
-  0,
-  sizeof(int),
-  sizeof(int) + sizeof(int)
-};
-MPI_Datatype block_types[3] = {
-  MPI_INT, MPI_INT, MPI_DOUBLE
-};
-
-MPI_Datatype process_state_type;
-int process_state_type_size;
 
 
 struct ProcessData
@@ -159,7 +102,7 @@ void doing_fine(ProcessData &data, const int iter) {
 
   VLOG(2) << "start computation";
   data.fine_val = data.fine_val_in + (data.state.iter + 1) * FINE_MULTIPLIER + iter * 0.001;
-  VLOG(3) << data.fine_val << " = " << data.fine_val_in << " + " << ((data.rank + 1) * FINE_MULTIPLIER) << " + " << (iter * 0.001);
+  VLOG(3) << data.fine_val << " = " << data.fine_val_in << " + " << ((data.state.iter + 1) * FINE_MULTIPLIER) << " + " << (iter * 0.001);
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
@@ -212,7 +155,7 @@ void doing_coarse(ProcessData &data, const int iter) {
 
   VLOG(2) << "start computation";
   data.coarse_val = data.coarse_val_in + (data.state.iter + 1) * COARSE_MULTIPLIER + iter * 0.001;
-  VLOG(3) << data.coarse_val << " = " << data.coarse_val_in << " + " << ((data.rank + 1) * COARSE_MULTIPLIER) << " + " << (iter * 0.001);
+  VLOG(3) << data.coarse_val << " = " << data.coarse_val_in << " + " << ((data.state.iter + 1) * COARSE_MULTIPLIER) << " + " << (iter * 0.001);
 
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
@@ -270,8 +213,14 @@ void check_finished(ProcessData &data, const int iter) {
 
   if (other_state.state == PState::FAILED) {
       data.state.state = PState::FAILED;
-  } else if (other_state.state == PState::CONVERGED && data.state.residual > RESIDUAL_TOL) {
-    data.state.state = PState::CONVERGED;
+  } else if (other_state.state == PState::CONVERGED) {
+    VLOG(2) << "previous converged";
+    if (data.state.residual > RESIDUAL_TOL) {
+      VLOG(2) << "and I'm done as well";
+      data.state.state = PState::CONVERGED;
+    } else {
+      VLOG(2) << "but I'm not yet done";
+    }
   }
 
   if (data.size > 1) {
@@ -325,12 +274,21 @@ int main(int argn, char** argv) {
       LOG(INFO) << "inital values:\tcoarse=" << std::fixed << std::setprecision(3) << myself.coarse_val_in << "\tfine=" << myself.fine_val_in;
 
       for(int iter = 0; myself.state.state > PState::FAILED; ++iter) {
-        update_state(myself, PState::ITERATING, iter);
+        if (iter == 0) {
+          for (int proc = - myself.rank; proc <= 0; ++proc) {
+            update_state(myself, PState::PREDICTING, iter);
 
-        doing_pre_coarse(myself);
-        doing_coarse(myself, iter);
-        doing_post_coarse(myself);
+            doing_pre_coarse(myself);
+            doing_coarse(myself, iter);
+            doing_post_coarse(myself);
+          }
+        } else {
+          update_state(myself, PState::ITERATING, iter);
 
+          doing_pre_coarse(myself);
+          doing_coarse(myself, iter);
+          doing_post_coarse(myself);
+        }
         doing_pre_fine(myself);
         doing_fine(myself, iter);
         doing_post_fine(myself);

@@ -44,11 +44,17 @@ enum class PState : int {
   // overall state
   CONVERGED        =  0,
   FAILED           =  1,
+
   // iterating states
-  PREDICT          = 10,
+  PREDICTING       = 10,
+  ITERATING        = 11,
+
+  // coarse level
   PRE_ITER_COARSE  = 20,
   ITER_COARSE      = 21,
   POST_ITER_COARSE = 22,
+
+  // fine level
   PRE_ITER_FINE    = 30,
   ITER_FINE        = 31,
   POST_ITER_FINE   = 32,
