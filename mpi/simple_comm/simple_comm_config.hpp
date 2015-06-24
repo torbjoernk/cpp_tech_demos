@@ -26,9 +26,9 @@ boost::format log_fmt;
 #define MAX_ITER                   5
 #define BASE_DELAY              1000  // nanoseconds
 #define FINE_MULTIPLIER       200000
-#define FINE_DELAY_VARIANCE    10000
+#define FINE_DELAY_VARIANCE     0.50  // as percent of default delay
 #define COARSE_MULTIPLIER      10000
-#define COARSE_DELAY_VARIANCE   1000
+#define COARSE_DELAY_VARIANCE   0.25  // as percent of default delay
 #define STATE_MULTIPLIER          10
 
 #define TOTAL_STEPS                4
@@ -104,7 +104,7 @@ inline static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPL
 
 inline static void default_delay(const int iter, const long delay)
 {
-  VLOG(2) << "waiting for " << delay << " microseconds";
+  VLOG(2) << "waiting for " << delay << " nanoseconds";
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
   start = Clock::now();
