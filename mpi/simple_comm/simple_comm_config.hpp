@@ -6,6 +6,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <random>
 using namespace std;
 
 typedef chrono::system_clock Clock;
@@ -22,14 +23,16 @@ boost::format log_fmt;
 #ifndef _MPI__SIMPLE_COMM_CONFIG_HPP_
 #define _MPI__SIMPLE_COMM_CONFIG_HPP_
 
-#define MAX_ITER                 5
-#define BASE_DELAY            1000  // nanoseconds
-#define FINE_MULTIPLIER     200000
-#define COARSE_MULTIPLIER    10000
-#define STATE_MULTIPLIER        10
+#define MAX_ITER                   5
+#define BASE_DELAY              1000  // nanoseconds
+#define FINE_MULTIPLIER       200000
+#define FINE_DELAY_VARIANCE    10000
+#define COARSE_MULTIPLIER      10000
+#define COARSE_DELAY_VARIANCE   1000
+#define STATE_MULTIPLIER          10
 
-#define TOTAL_STEPS              4
-#define RESIDUAL_TOL             2  // seconds
+#define TOTAL_STEPS                4
+#define RESIDUAL_TOL               2  // seconds
 
 
 inline static void init_additional_loggers()
@@ -99,26 +102,34 @@ inline static int coarse_tag(const int iter) { return (abs(iter) + 1) * (COARSE_
 inline static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
 
 
-static void default_fine_delay(const int iter=-1)
+inline static void default_delay(const int iter, const long delay)
 {
+  VLOG(2) << "waiting for " << delay << " microseconds";
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
   start = Clock::now();
   do {
     end = Clock::now();
     duration = end - start;
-  } while(duration.count() < BASE_DELAY * FINE_MULTIPLIER);
+  } while(duration.count() < delay);
 }
 
-static void default_coarse_delay(const int iter=-1)
+inline static void random_delay(const int iter, const long base_delay, const long variance)
 {
-  chrono::time_point<Clock> start, end;
-  ClockResolution duration;
-  start = Clock::now();
-  do {
-    end = Clock::now();
-    duration = end - start;
-  } while(duration.count() < BASE_DELAY * COARSE_MULTIPLIER);
+  random_device rd;
+  mt19937 gen(rd());
+  uniform_int_distribution<long> dis(base_delay - variance, base_delay + variance);
+  default_delay(iter, dis(gen));
+}
+
+inline static void default_fine_delay(const int iter=-1)
+{
+  default_delay(iter, BASE_DELAY * FINE_MULTIPLIER);
+}
+
+inline static void default_coarse_delay(const int iter=-1)
+{
+  default_delay(iter, BASE_DELAY * COARSE_MULTIPLIER);
 }
 
 
@@ -143,7 +154,7 @@ class Process
       MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
     }
 
-    virtual void comp_fine(function<void(int)> delay = bind(default_fine_delay, -1))
+    virtual void comp_fine(function<void(int)> delay)
     {
       CVLOG(2, "Process") << "start computation";
       this->fine_val += (this->rank + 1) * FINE_MULTIPLIER + this->state.iter * 0.001;
@@ -155,7 +166,7 @@ class Process
       CVLOG(2, "Process") << "done computation";
     }
 
-    virtual void comp_coarse(function<void(int)> delay = bind(default_coarse_delay, -1))
+    virtual void comp_coarse(function<void(int)> delay)
     {
       CVLOG(2, "Process") << "start computation";
       this->coarse_val += (this->rank + 1) * COARSE_MULTIPLIER + this->state.iter * 0.001;
@@ -271,9 +282,12 @@ class Controller
   public:
     shared_ptr<Communicator> comm;
     shared_ptr<Process> proc;
+    function<void(int)> _fine_delay;
+    function<void(int)> _coarse_delay;
 
     Controller(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
-      : comm(comm), proc(proc)
+      : comm(comm), proc(proc),
+        _fine_delay(bind(default_fine_delay, -1)), _coarse_delay(bind(default_coarse_delay, -1))
     {}
 
     virtual void do_fine()
@@ -282,7 +296,7 @@ class Controller
       this->comm->recv_fine(this->proc);
       this->comm->pre_comp_fine(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_FINE);
-      this->proc->comp_fine();
+      this->proc->comp_fine(this->_fine_delay);
       this->comm->post_comp_fine(this->proc);
       this->comm->send_fine(this->proc);
     }
@@ -293,7 +307,7 @@ class Controller
       this->comm->recv_coarse(this->proc);
       this->comm->pre_comp_coarse(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_COARSE);
-      this->proc->comp_coarse();
+      this->proc->comp_coarse(this->_coarse_delay);
       this->comm->post_comp_coarse(this->proc);
       this->comm->send_coarse(this->proc);
     }

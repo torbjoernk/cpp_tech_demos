@@ -215,6 +215,9 @@ int main(int argn, char** argv) {
     shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
     RmaGetController controll(comm, proc);
 
+    controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DELAY_VARIANCE);
+    controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DELAY_VARIANCE);
+
     if (rank < working_size) {
       proc->fine_val = initial_value;
       proc->coarse_val = initial_value / FINE_MULTIPLIER;

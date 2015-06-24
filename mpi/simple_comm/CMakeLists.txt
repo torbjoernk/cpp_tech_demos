@@ -1,6 +1,6 @@
 if(${Boost_FOUND})
   set(executables
-    simple_comm
+    simple_comm_isend
     simple_comm_rma_get
   )
 
