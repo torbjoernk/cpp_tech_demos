@@ -2,8 +2,6 @@ if(${Boost_FOUND})
   set(executables
     simple_comm
     simple_comm_rma_get
-    simple_comm_rma_get_split
-    simple_comm_rma_put
   )
 
   include_directories(${Boost_INCLUDE_DIRS})
