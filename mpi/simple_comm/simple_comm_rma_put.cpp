@@ -1,7 +1,7 @@
 #include "simple_comm_config.hpp"
 
 
-struct ProcessData
+struct Process
 {
   int size = -1;
   int rank = -1;
@@ -60,7 +60,7 @@ static int coarse_tag(const int iter) { return (iter + 1) * COARSE_MULTIPLIER; }
 static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
 
 
-void doing_fine(ProcessData &data, const int iter) {
+void doing_fine(Process &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
   if (data.size > 1) {
@@ -104,7 +104,7 @@ void doing_fine(ProcessData &data, const int iter) {
 
 }
 
-void doing_coarse(ProcessData &data, const int iter) {
+void doing_coarse(Process &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
 
   if (data.size > 1) {
@@ -148,7 +148,7 @@ void doing_coarse(ProcessData &data, const int iter) {
 }
 
 
-void check_finished(ProcessData &data, const int iter) {
+void check_finished(Process &data, const int iter) {
   int mpi_err = MPI_SUCCESS;
   ProcessState other_state;
 
@@ -216,7 +216,7 @@ int main(int argn, char** argv) {
 
     int mpi_err = MPI_SUCCESS;
 
-    ProcessData myself;
+    Process myself;
 
     myself.rank = rank;
     int working_size = (curr_step_start + size - 1 < TOTAL_STEPS) ? size : TOTAL_STEPS % size;
