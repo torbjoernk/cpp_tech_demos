@@ -105,16 +105,6 @@ class NonBlockingSendCommunicator
 };
 
 
-class NonBlockingSendControll
-  : public Controller
-{
-  public:
-    NonBlockingSendControll(shared_ptr<NonBlockingSendCommunicator> comm, shared_ptr<NonBlockingSendProcess> proc)
-      : Controller(comm, proc)
-    {}
-};
-
-
 int main(int argn, char** argv) {
   //                       iter    residual    coarse      fine
   log_fmt = boost::format("%4.d    %12.6f      %12.3f      %12.3f");
@@ -143,10 +133,12 @@ int main(int argn, char** argv) {
 
     shared_ptr<NonBlockingSendCommunicator> comm = make_shared<NonBlockingSendCommunicator>(working_size);
     shared_ptr<NonBlockingSendProcess> proc = make_shared<NonBlockingSendProcess>(mpi_start);
-    NonBlockingSendControll controll(comm, proc);
+    FixedIterationController controll(comm, proc);
 
-    controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
-    controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
+//     controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
+//     controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
+    controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
+    controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
 
     if (rank < working_size) {
       LOG(INFO) << "doing step " << (curr_step_start + rank);

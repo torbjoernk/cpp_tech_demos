@@ -26,10 +26,13 @@ boost::format log_fmt;
 #define MAX_ITER                   5
 #define BASE_DELAY              1000  // nanoseconds
 #define FINE_MULTIPLIER       200000
-#define FINE_DELAY_VARIANCE     0.50  // as percent of default delay
 #define COARSE_MULTIPLIER      10000
-#define COARSE_DELAY_VARIANCE   0.25  // as percent of default delay
 #define STATE_MULTIPLIER          10
+
+#define FINE_DELAY_VARIANCE     0.50  // as percent of default delay
+#define COARSE_DELAY_VARIANCE   0.25  // as percent of default delay
+#define FINE_DEMINISH           0.10  // as percent
+#define COARSE_DEMINISH         0.01  // as percent
 
 #define TOTAL_STEPS                4
 #define RESIDUAL_TOL               2  // seconds
@@ -120,6 +123,15 @@ inline static void random_delay(const int iter, const long base_delay, const lon
   mt19937 gen(rd());
   uniform_int_distribution<long> dis(base_delay - variance, base_delay + variance);
   default_delay(iter, dis(gen));
+}
+
+inline static void deminishing_delay(const int iter, const long base_delay, const double deminish)
+{
+  if (iter >= 0) {
+    default_delay(iter, max((long)BASE_DELAY, (long)(base_delay - base_delay * log10(2 * deminish + pow(iter, deminish)))));
+  } else {
+    default_delay(iter, base_delay);
+  }
 }
 
 inline static void default_fine_delay(const int iter=-1)
@@ -326,6 +338,52 @@ class Controller
     {
       int iter = 0;
       for(; this->proc->state.state > PState::FAILED; ++iter) {
+        if (iter == 0) {
+          this->comm->set_pstate(this->proc, PState::PREDICTING);
+          for (int p = - this->comm->rank; p <= 0; ++p) {
+            CVLOG(2, "Controller") << "predict " << p;
+            this->comm->set_iter(this->proc, p);
+            this->do_coarse();
+            log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
+            CLOG(INFO, "Controller") << "PREDICT " << log_fmt;
+          }
+        } else {
+          this->comm->set_pstate(this->proc, PState::ITERATING);
+          this->comm->set_iter(this->proc, iter);
+          this->do_coarse();
+        }
+
+        this->do_fine();
+
+        this->check_state();
+        log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
+        CLOG(INFO, "Controller") << "ITERATE " << log_fmt;
+      }
+
+      this->comm->cleanup();
+
+      log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
+      CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
+
+      return iter;
+    }
+};
+
+
+class FixedIterationController
+  : public Controller
+{
+  public:
+    int max_iter = 10;
+
+    FixedIterationController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
+      : Controller(comm, proc)
+    {}
+
+    int run() override
+    {
+      int iter = 0;
+      for(; iter < this->max_iter; ++iter) {
         if (iter == 0) {
           this->comm->set_pstate(this->proc, PState::PREDICTING);
           for (int p = - this->comm->rank; p <= 0; ++p) {

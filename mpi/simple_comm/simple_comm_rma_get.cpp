@@ -163,12 +163,13 @@ class RmaGetCommunicator
 };
 
 
+template<typename BaseControll>
 class RmaGetController
-  : public Controller
+  : public BaseControll
 {
   public:
     RmaGetController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
-      : Controller(comm, proc)
+      : BaseControll(comm, proc)
     {
       if (this->comm->size > 1) {
         CVLOG(6, "Controller") << "creating windows";
@@ -192,6 +193,7 @@ int main(int argn, char** argv) {
   MPI_Init(&argn, &argv);
 
   init_log(argn, argv);
+  init_additional_loggers();
 
   int size = -1;
   int rank = -1;
@@ -213,10 +215,12 @@ int main(int argn, char** argv) {
 
     shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>(working_size);
     shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
-    RmaGetController controll(comm, proc);
+    RmaGetController<FixedIterationController> controll(comm, proc);
 
-    controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
-    controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
+//     controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
+//     controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
+    controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
+    controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
 
     if (rank < working_size) {
       proc->fine_val = initial_value;
