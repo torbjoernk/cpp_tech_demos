@@ -137,8 +137,12 @@ int main(int argn, char** argv) {
 
 //     controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
 //     controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
-    controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
-    controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
+
+//     controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
+//     controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
+
+    controll._fine_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, comm->rank, true);
+    controll._coarse_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, comm->rank, false);
 
     if (rank < working_size) {
       LOG(INFO) << "doing step " << (curr_step_start + rank);

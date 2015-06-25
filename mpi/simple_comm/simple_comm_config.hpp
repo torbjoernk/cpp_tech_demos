@@ -134,6 +134,15 @@ inline static void deminishing_delay(const int iter, const long base_delay, cons
   }
 }
 
+inline static void specific_delay(const int iter, const long base_delay, const int rank, const bool fine)
+{
+  if (iter == 3 && fine && rank == 2) {
+    default_delay(iter, 1.5 * base_delay);
+  } else {
+    default_delay(iter, base_delay);
+  }
+}
+
 inline static void default_fine_delay(const int iter=-1)
 {
   default_delay(iter, BASE_DELAY * FINE_MULTIPLIER);
@@ -227,6 +236,7 @@ class Communicator
     int mpi_err = MPI_SUCCESS;
 
     Communicator(const int size)
+      : size(size)
     {
       MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
       assert(rank >= 0 && size > 0);
@@ -280,7 +290,7 @@ class Communicator
     virtual void send_state(shared_ptr<Process> proc) {}
 
     virtual void bcast_fine(shared_ptr<Process> proc) {
-      CVLOG(4, "Communicator") << "broadcasting final value to all";
+      CVLOG(4, "Communicator") << "broadcasting final value from " << (this->size - 1) << " to all";
       mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, this->size - 1, MPI_COMM_WORLD);
       assert(mpi_err == MPI_SUCCESS);
     }
@@ -365,6 +375,8 @@ class Controller
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
 
+      this->comm->bcast_fine(this->proc);
+
       return iter;
     }
 };
@@ -410,6 +422,8 @@ class FixedIterationController
 
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
+
+      this->comm->bcast_fine(this->proc);
 
       return iter;
     }
