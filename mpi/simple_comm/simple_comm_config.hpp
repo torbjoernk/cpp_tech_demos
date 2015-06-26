@@ -40,11 +40,9 @@ boost::format log_fmt;
 
 inline static void init_additional_loggers()
 {
-#ifndef NO_LOGGING
   add_custom_logger("Process");
   add_custom_logger("Communicator");
   add_custom_logger("Controller");
-#endif
 }
 
 
@@ -109,7 +107,9 @@ inline static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPL
 
 inline static void default_delay(const int iter, const long delay)
 {
+#ifndef NO_LOGGING
   VLOG(2) << "waiting for " << delay << " nanoseconds";
+#endif
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
   start = Clock::now();
@@ -179,26 +179,39 @@ class Process
 
     virtual void comp_fine(function<void(int)> delay)
     {
+#ifndef NO_LOGGING
       CVLOG(2, "Process") << "start computation";
+#endif
       this->fine_val += (this->rank + 1) * FINE_MULTIPLIER + this->state.iter * 0.001;
+#ifndef NO_LOGGING
       CVLOG(3, "Process") << this->fine_val << " = " << this->fine_val << " + "
                           << ((this->state.iter + 1) * FINE_MULTIPLIER)
                           << " + " << (this->state.iter * 0.001);
+#endif
 
       delay(this->state.iter);
+#ifndef NO_LOGGING
       CVLOG(2, "Process") << "done computation";
+#endif
     }
 
     virtual void comp_coarse(function<void(int)> delay)
     {
+#ifndef NO_LOGGING
       CVLOG(2, "Process") << "start computation";
+#endif
       this->coarse_val += (this->rank + 1) * COARSE_MULTIPLIER + this->state.iter * 0.001;
+#ifndef NO_LOGGING
       CVLOG(3, "Process") << this->coarse_val << " = " << this->coarse_val << " + "
                           << ((this->state.iter + 1) * COARSE_MULTIPLIER)
                           << " + " << (this->state.iter * 0.001);
+#endif
 
       delay(this->state.iter);
+
+#ifndef NO_LOGGING
       CVLOG(2, "Process") << "done computation";
+#endif
     }
 
     virtual void check_state()
@@ -209,12 +222,18 @@ class Process
       if (this->prev_state.state == PState::FAILED) {
           this->state.state = PState::FAILED;
       } else if (this->prev_state.state == PState::CONVERGED) {
+#ifndef NO_LOGGING
         CVLOG(2, "Process") << "previous converged";
+#endif
         if (this->state.residual > RESIDUAL_TOL) {
+#ifndef NO_LOGGING
           CVLOG(2, "Process") << "and I'm done as well";
+#endif
           this->state.state = PState::CONVERGED;
         } else {
+#ifndef NO_LOGGING
           CVLOG(2, "Process") << "but I'm not yet done";
+#endif
         }
       }
     }
@@ -292,7 +311,9 @@ class Communicator
     virtual void send_state(shared_ptr<Process> proc) {}
 
     virtual void bcast_fine(shared_ptr<Process> proc) {
+#ifndef NO_LOGGING
       CVLOG(4, "Communicator") << "broadcasting final value from " << (this->size - 1) << " to all";
+#endif
       mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, this->size - 1, MPI_COMM_WORLD);
       assert(mpi_err == MPI_SUCCESS);
     }
@@ -316,7 +337,9 @@ class Controller
 
     virtual void do_fine()
     {
+#ifndef NO_LOGGING
       CVLOG(2, "Controller") << "doing fine";
+#endif
       this->comm->recv_fine(this->proc);
       this->comm->pre_comp_fine(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_FINE);
@@ -327,7 +350,9 @@ class Controller
 
     virtual void do_coarse()
     {
+#ifndef NO_LOGGING
       CVLOG(2, "Controller") << "doing coarse";
+#endif
       this->comm->recv_coarse(this->proc);
       this->comm->pre_comp_coarse(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_COARSE);
@@ -338,7 +363,9 @@ class Controller
 
     virtual void check_state()
     {
+#ifndef NO_LOGGING
       CVLOG(2, "Controller") << "checking state";
+#endif
       this->comm->recv_state(this->proc);
       this->comm->pre_update_state(this->proc);
       this->proc->check_state();
@@ -353,7 +380,9 @@ class Controller
         if (iter == 0) {
           this->comm->set_pstate(this->proc, PState::PREDICTING);
           for (int p = - this->comm->rank; p <= 0; ++p) {
+#ifndef NO_LOGGING
             CVLOG(2, "Controller") << "predict " << p;
+#endif
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
 #ifndef NO_LOGGING
@@ -407,7 +436,9 @@ class FixedIterationController
         if (iter == 0) {
           this->comm->set_pstate(this->proc, PState::PREDICTING);
           for (int p = - this->comm->rank; p <= 0; ++p) {
+#ifndef NO_LOGGING
             CVLOG(2, "Controller") << "predict " << p;
+#endif
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
 #ifndef NO_LOGGING

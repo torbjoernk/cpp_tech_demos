@@ -12,16 +12,16 @@ using namespace std;
 
 #ifdef NO_LOGGING
   #define ELPP_DISABLE_LOGGING
+#else
+  // enable easy logging of STL containers
+  #define ELPP_STL_LOGGING
+  // disable creation of default log file
+  #define ELPP_NO_DEFAULT_LOG_FILE
+  // enable passing `--logging-flags` via command line
+  #define ELPP_LOGGING_FLAGS_FROM_ARG
+  #include "easylogging++.h"
+  INITIALIZE_EASYLOGGINGPP
 #endif
-
-// enable easy logging of STL containers
-#define ELPP_STL_LOGGING
-// disable creation of default log file
-#define ELPP_NO_DEFAULT_LOG_FILE
-// enable passing `--logging-flags` via command line
-#define ELPP_LOGGING_FLAGS_FROM_ARG
-#include "easylogging++.h"
-INITIALIZE_EASYLOGGINGPP
 
 
 int get_rank()
@@ -57,10 +57,10 @@ inline string get_log_file_name()
 }
 
 
+#ifndef NO_LOGGING
 inline void set_global_logging_options(el::Configurations* conf,
                                        const el::Configurations* default_conf = nullptr)
 {
-#ifndef NO_LOGGING
   string to_stdout;
   if (default_conf) {
     el::Configurations* default_conf_nc = const_cast<el::Configurations*>(default_conf);
@@ -73,8 +73,8 @@ inline void set_global_logging_options(el::Configurations* conf,
   conf->setGlobally(el::ConfigurationType::MillisecondsWidth, MILLISEC_WIDTH);
   conf->setGlobally(el::ConfigurationType::ToStandardOutput, to_stdout);
   conf->setGlobally(el::ConfigurationType::Filename, get_log_file_name());
-#endif
 }
+#endif
 
 inline static void add_custom_logger(const string& id)
 {
@@ -120,9 +120,9 @@ inline static void add_custom_logger(const string& id)
 
 inline static void init_log(int argn, char** argv)
 {
+#ifndef NO_LOGGING
   START_EASYLOGGINGPP(argn, argv);
 
-#ifndef NO_LOGGING
   el::Loggers::addFlag(el::LoggingFlag::LogDetailedCrashReason);
   el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
   el::Loggers::addFlag(el::LoggingFlag::MultiLoggerSupport);
