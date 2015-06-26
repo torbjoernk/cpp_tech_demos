@@ -201,6 +201,7 @@ class Communicator
     int mpi_err = MPI_SUCCESS;
 
     Communicator(const int size)
+      : size(size)
     {
       MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
       assert(rank >= 0 && size > 0);
@@ -335,6 +336,8 @@ class Controller
 
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
+
+      this->comm->bcast_fine(this->proc);
 
       return iter;
     }

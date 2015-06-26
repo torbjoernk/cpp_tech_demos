@@ -586,13 +586,13 @@ class RmaGetCommunicator
 };
 
 
-template<typename BaseControll>
+// template<typename BaseControll>
 class RmaGetController
-  : public BaseControll
+  : public Controller
 {
   public:
     RmaGetController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
-      : BaseControll(comm, proc)
+      : Controller(comm, proc)
     {
       if (this->comm->size > 1) {
         CVLOG(6, "Controller") << "creating windows";
@@ -638,7 +638,7 @@ int main(int argn, char** argv) {
 
     shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>(working_size);
     shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
-    RmaGetController<FixedIterationController> controll(comm, proc);
+    RmaGetController controll(comm, proc);
 
 //     controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
 //     controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
@@ -646,8 +646,8 @@ int main(int argn, char** argv) {
 //     controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
 //     controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
 
-    controll._fine_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, comm->rank, true);
-    controll._coarse_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, comm->rank, false);
+//    controll._fine_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, comm->rank, true);
+//    controll._coarse_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, comm->rank, false);
 
     if (rank < working_size) {
       proc->fine_val = initial_value;
