@@ -10,6 +10,10 @@ using namespace std;
 
 #define MILLISEC_WIDTH "6"
 
+#ifdef NO_LOGGING
+  #define ELPP_DISABLE_LOGGING
+#endif
+
 // enable easy logging of STL containers
 #define ELPP_STL_LOGGING
 // disable creation of default log file
@@ -56,6 +60,7 @@ inline string get_log_file_name()
 inline void set_global_logging_options(el::Configurations* conf,
                                        const el::Configurations* default_conf = nullptr)
 {
+#ifndef NO_LOGGING
   string to_stdout;
   if (default_conf) {
     el::Configurations* default_conf_nc = const_cast<el::Configurations*>(default_conf);
@@ -68,10 +73,12 @@ inline void set_global_logging_options(el::Configurations* conf,
   conf->setGlobally(el::ConfigurationType::MillisecondsWidth, MILLISEC_WIDTH);
   conf->setGlobally(el::ConfigurationType::ToStandardOutput, to_stdout);
   conf->setGlobally(el::ConfigurationType::Filename, get_log_file_name());
+#endif
 }
 
 inline static void add_custom_logger(const string& id)
 {
+#ifndef NO_LOGGING
   const string TIMESTAMP = "%datetime{%H:%m:%s,%g} ";
   const string LEVEL = "%level";
   const string VLEVEL = "VERB%vlevel";
@@ -108,12 +115,14 @@ inline static void add_custom_logger(const string& id)
   conf->set(el::Level::Verbose, el::ConfigurationType::Format,
             TIMESTAMP + "[" + id2print + ", " + VLEVEL + MPI_RANK + "] " + MESSAGE);
   el::Loggers::reconfigureLogger(logger, *conf);
+#endif
 }
 
 inline static void init_log(int argn, char** argv)
 {
   START_EASYLOGGINGPP(argn, argv);
 
+#ifndef NO_LOGGING
   el::Loggers::addFlag(el::LoggingFlag::LogDetailedCrashReason);
   el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
   el::Loggers::addFlag(el::LoggingFlag::MultiLoggerSupport);
@@ -129,4 +138,5 @@ inline static void init_log(int argn, char** argv)
   el::Loggers::setDefaultConfigurations(defaultConf, true);
 
   add_custom_logger("default");
+#endif
 }

@@ -40,9 +40,11 @@ boost::format log_fmt;
 
 inline static void init_additional_loggers()
 {
+#ifndef NO_LOGGING
   add_custom_logger("Process");
   add_custom_logger("Communicator");
   add_custom_logger("Controller");
+#endif
 }
 
 
@@ -354,8 +356,10 @@ class Controller
             CVLOG(2, "Controller") << "predict " << p;
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
+#ifndef NO_LOGGING
             log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
             CLOG(INFO, "Controller") << "PREDICT " << log_fmt;
+#endif
           }
         } else {
           this->comm->set_pstate(this->proc, PState::ITERATING);
@@ -366,14 +370,18 @@ class Controller
         this->do_fine();
 
         this->check_state();
+#ifndef NO_LOGGING
         log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
         CLOG(INFO, "Controller") << "ITERATE " << log_fmt;
+#endif
       }
 
       this->comm->cleanup();
 
+#ifndef NO_LOGGING
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
+#endif
 
       this->comm->bcast_fine(this->proc);
 
@@ -402,8 +410,10 @@ class FixedIterationController
             CVLOG(2, "Controller") << "predict " << p;
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
+#ifndef NO_LOGGING
             log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
             CLOG(INFO, "Controller") << "PREDICT " << log_fmt;
+#endif
           }
         } else {
           this->comm->set_pstate(this->proc, PState::ITERATING);
@@ -414,14 +424,18 @@ class FixedIterationController
         this->do_fine();
 
         this->check_state();
+#ifndef NO_LOGGING
         log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
         CLOG(INFO, "Controller") << "ITERATE " << log_fmt;
+#endif
       }
 
       this->comm->cleanup();
 
+#ifndef NO_LOGGING
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
+#endif
 
       this->comm->bcast_fine(this->proc);
 

@@ -187,8 +187,10 @@ class RmaGetController
 
 
 int main(int argn, char** argv) {
+#ifndef NO_LOGGING
   //                       iter    residual    coarse      fine
   log_fmt = boost::format("%4.d    %12.6f      %12.3f      %12.3f");
+#endif
 
   MPI_Init(&argn, &argv);
 
