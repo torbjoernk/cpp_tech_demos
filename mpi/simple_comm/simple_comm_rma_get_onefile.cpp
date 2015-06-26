@@ -1,6 +1,3 @@
-#ifndef _MPI__SIMPLE_COMM_CONFIG_HPP_
-#define _MPI__SIMPLE_COMM_CONFIG_HPP_
-
 #include <cassert>
 #include <sstream>
 #include <iostream>
@@ -22,6 +19,7 @@ boost::format log_fmt;
 
 #define WITH_MPI
 #include "../../logging.hpp"
+
 
 #define MAX_ITER                   5
 #define BASE_DELAY              1000  // nanoseconds
@@ -100,16 +98,9 @@ MPI_Datatype process_state_type;
 int process_state_type_size;
 
 
-inline static int fine_tag(const int iter)   { return (iter + 1) * FINE_MULTIPLIER; }
-inline static int coarse_tag(const int iter) { return (abs(iter) + 1) * (COARSE_MULTIPLIER / 10); }
-inline static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
-
-
 inline static void default_delay(const int iter, const long delay)
 {
-#ifndef NO_LOGGING
   VLOG(2) << "waiting for " << delay << " nanoseconds";
-#endif
   chrono::time_point<Clock> start, end;
   ClockResolution duration;
   start = Clock::now();
@@ -179,39 +170,26 @@ class Process
 
     virtual void comp_fine(function<void(int)> delay)
     {
-#ifndef NO_LOGGING
       CVLOG(2, "Process") << "start computation";
-#endif
       this->fine_val += (this->rank + 1) * FINE_MULTIPLIER + this->state.iter * 0.001;
-#ifndef NO_LOGGING
       CVLOG(3, "Process") << this->fine_val << " = " << this->fine_val << " + "
                           << ((this->state.iter + 1) * FINE_MULTIPLIER)
                           << " + " << (this->state.iter * 0.001);
-#endif
 
       delay(this->state.iter);
-#ifndef NO_LOGGING
       CVLOG(2, "Process") << "done computation";
-#endif
     }
 
     virtual void comp_coarse(function<void(int)> delay)
     {
-#ifndef NO_LOGGING
       CVLOG(2, "Process") << "start computation";
-#endif
       this->coarse_val += (this->rank + 1) * COARSE_MULTIPLIER + this->state.iter * 0.001;
-#ifndef NO_LOGGING
       CVLOG(3, "Process") << this->coarse_val << " = " << this->coarse_val << " + "
                           << ((this->state.iter + 1) * COARSE_MULTIPLIER)
                           << " + " << (this->state.iter * 0.001);
-#endif
 
       delay(this->state.iter);
-
-#ifndef NO_LOGGING
       CVLOG(2, "Process") << "done computation";
-#endif
     }
 
     virtual void check_state()
@@ -222,18 +200,12 @@ class Process
       if (this->prev_state.state == PState::FAILED) {
           this->state.state = PState::FAILED;
       } else if (this->prev_state.state == PState::CONVERGED) {
-#ifndef NO_LOGGING
         CVLOG(2, "Process") << "previous converged";
-#endif
         if (this->state.residual > RESIDUAL_TOL) {
-#ifndef NO_LOGGING
           CVLOG(2, "Process") << "and I'm done as well";
-#endif
           this->state.state = PState::CONVERGED;
         } else {
-#ifndef NO_LOGGING
           CVLOG(2, "Process") << "but I'm not yet done";
-#endif
         }
       }
     }
@@ -311,9 +283,7 @@ class Communicator
     virtual void send_state(shared_ptr<Process> proc) {}
 
     virtual void bcast_fine(shared_ptr<Process> proc) {
-#ifndef NO_LOGGING
       CVLOG(4, "Communicator") << "broadcasting final value from " << (this->size - 1) << " to all";
-#endif
       mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, this->size - 1, MPI_COMM_WORLD);
       assert(mpi_err == MPI_SUCCESS);
     }
@@ -337,9 +307,7 @@ class Controller
 
     virtual void do_fine()
     {
-#ifndef NO_LOGGING
       CVLOG(2, "Controller") << "doing fine";
-#endif
       this->comm->recv_fine(this->proc);
       this->comm->pre_comp_fine(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_FINE);
@@ -350,9 +318,7 @@ class Controller
 
     virtual void do_coarse()
     {
-#ifndef NO_LOGGING
       CVLOG(2, "Controller") << "doing coarse";
-#endif
       this->comm->recv_coarse(this->proc);
       this->comm->pre_comp_coarse(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_COARSE);
@@ -363,9 +329,7 @@ class Controller
 
     virtual void check_state()
     {
-#ifndef NO_LOGGING
       CVLOG(2, "Controller") << "checking state";
-#endif
       this->comm->recv_state(this->proc);
       this->comm->pre_update_state(this->proc);
       this->proc->check_state();
@@ -380,15 +344,11 @@ class Controller
         if (iter == 0) {
           this->comm->set_pstate(this->proc, PState::PREDICTING);
           for (int p = - this->comm->rank; p <= 0; ++p) {
-#ifndef NO_LOGGING
             CVLOG(2, "Controller") << "predict " << p;
-#endif
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
-#ifndef NO_LOGGING
             log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
             CLOG(INFO, "Controller") << "PREDICT " << log_fmt;
-#endif
           }
         } else {
           this->comm->set_pstate(this->proc, PState::ITERATING);
@@ -399,18 +359,14 @@ class Controller
         this->do_fine();
 
         this->check_state();
-#ifndef NO_LOGGING
         log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
         CLOG(INFO, "Controller") << "ITERATE " << log_fmt;
-#endif
       }
 
       this->comm->cleanup();
 
-#ifndef NO_LOGGING
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
-#endif
 
       this->comm->bcast_fine(this->proc);
 
@@ -436,15 +392,11 @@ class FixedIterationController
         if (iter == 0) {
           this->comm->set_pstate(this->proc, PState::PREDICTING);
           for (int p = - this->comm->rank; p <= 0; ++p) {
-#ifndef NO_LOGGING
             CVLOG(2, "Controller") << "predict " << p;
-#endif
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
-#ifndef NO_LOGGING
             log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
             CLOG(INFO, "Controller") << "PREDICT " << log_fmt;
-#endif
           }
         } else {
           this->comm->set_pstate(this->proc, PState::ITERATING);
@@ -455,18 +407,14 @@ class FixedIterationController
         this->do_fine();
 
         this->check_state();
-#ifndef NO_LOGGING
         log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
         CLOG(INFO, "Controller") << "ITERATE " << log_fmt;
-#endif
       }
 
       this->comm->cleanup();
 
-#ifndef NO_LOGGING
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
-#endif
 
       this->comm->bcast_fine(this->proc);
 
@@ -474,4 +422,251 @@ class FixedIterationController
     }
 };
 
-#endif // _MPI__SIMPLE_COMM_CONFIG_HPP_
+
+
+class RmaGetProcess
+  : public Process
+{
+  public:
+    RmaGetProcess(const double start_time)
+      : Process(start_time)
+    {}
+};
+
+
+class RmaGetCommunicator
+  : public Communicator
+{
+  public:
+    MPI_Win coarse_win;
+    MPI_Win fine_win;
+    MPI_Win state_win;
+
+    RmaGetCommunicator(const int size)
+      : Communicator(size)
+    {
+      this->coarse_win = MPI_WIN_NULL;
+      this->fine_win = MPI_WIN_NULL;
+      this->state_win = MPI_WIN_NULL;
+    }
+
+    void recv_fine(shared_ptr<Process> proc) override
+    {
+      if (this->size > 1 && !this->iam_first && proc->state.iter > 0) {
+        CVLOG(5, "Communicator") << "locking fine window to rank " << this->prev;
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->prev, 0, this->fine_win);
+        assert(mpi_err == MPI_SUCCESS);
+
+        CVLOG(4, "Communicator") << "getting fine value from " << this->prev;
+        mpi_err = MPI_Get(&(proc->fine_val_in), 1, MPI_DOUBLE, this->prev, 0, 1, MPI_DOUBLE, this->fine_win);
+        assert(mpi_err == MPI_SUCCESS);
+
+        mpi_err = MPI_Win_unlock(this->prev, this->fine_win);
+        assert(mpi_err == MPI_SUCCESS);
+        CVLOG(5, "Communicator") << "unlocked fine window to rank " << this->prev;
+      }
+    }
+
+    void pre_comp_fine(shared_ptr<Process> proc) override
+    {
+      Communicator::pre_comp_fine(proc);
+
+      if (this->size > 1) {
+        CVLOG(5, "Communicator") << "locking local fine window";
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->rank, 0, this->fine_win);
+        assert(mpi_err == MPI_SUCCESS);
+      }
+
+      proc->fine_val = proc->fine_val_in;
+    }
+
+    void post_comp_fine(shared_ptr<Process> proc) override
+    {
+      Communicator::post_comp_fine(proc);
+
+      proc->fine_val_out = proc->fine_val;
+
+      if (this->size > 1) {
+        mpi_err = MPI_Win_unlock(this->rank, this->fine_win);
+        assert(mpi_err == MPI_SUCCESS);
+        CVLOG(5, "Communicator") << "unlocked local fine window";
+      }
+    }
+
+    void recv_coarse(shared_ptr<Process> proc) override
+    {
+      if (this->size > 1 && !this->iam_first && proc->state.iter != - this->rank) {
+        CVLOG(5, "Communicator") << "locking coarse window to rank " << this->prev;
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->prev, 0, this->coarse_win);
+        assert(mpi_err == MPI_SUCCESS);
+
+        CVLOG(4, "Communicator") << "getting coarse value from " << this->prev;
+        mpi_err = MPI_Get(&(proc->coarse_val_in), 1, MPI_DOUBLE, this->prev, 0, 1, MPI_DOUBLE, this->coarse_win);
+        assert(mpi_err == MPI_SUCCESS);
+
+        mpi_err = MPI_Win_unlock(this->prev, this->coarse_win);
+        assert(mpi_err == MPI_SUCCESS);
+        CVLOG(5, "Communicator") << "unlocked coarse window to rank " << this->prev;
+      }
+    }
+
+    void pre_comp_coarse(shared_ptr<Process> proc) override
+    {
+      Communicator::pre_comp_coarse(proc);
+
+      if (this->size > 1) {
+        CVLOG(5, "Communicator") << "locking local coarse window";
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->rank, 0, this->coarse_win);
+        assert(mpi_err == MPI_SUCCESS);
+      }
+
+      proc->coarse_val = proc->coarse_val_in;
+    }
+
+    void post_comp_coarse(shared_ptr<Process> proc) override
+    {
+      Communicator::post_comp_coarse(proc);
+
+      proc->coarse_val_out = proc->coarse_val;
+
+      if (this->size > 1) {
+        mpi_err = MPI_Win_unlock(this->rank, this->coarse_win);
+        assert(mpi_err == MPI_SUCCESS);
+        CVLOG(5, "Communicator") << "unlocked local coarse window";
+      }
+    }
+
+    void recv_state(shared_ptr<Process> proc) override
+    {
+      if (this->size > 1 && !this->iam_first) {
+        CVLOG(5, "Communicator") << "locking state window to rank " << this->prev;
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->prev, 0, this->state_win);
+        assert(mpi_err == MPI_SUCCESS);
+
+        CVLOG(4, "Communicator") << "getting state from " << this->prev;
+        mpi_err = MPI_Get(&(proc->prev_state), 1, process_state_type, this->prev, 0, 1,
+                          process_state_type, this->state_win);
+        assert(mpi_err == MPI_SUCCESS);
+
+        mpi_err = MPI_Win_unlock(this->prev, this->state_win);
+        assert(mpi_err == MPI_SUCCESS);
+        CVLOG(5, "Communicator") << "unlocked state window to rank " << this->prev;
+      } else {
+        proc->prev_state.state = PState::CONVERGED;
+      }
+    }
+
+    void pre_update_state(shared_ptr<Process> proc) override
+    {
+      if (this->size > 1) {
+        CVLOG(5, "Communicator") << "locking local state window";
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->rank, 0, this->state_win);
+        assert(mpi_err == MPI_SUCCESS);
+      }
+    }
+
+    void post_update_state(shared_ptr<Process> proc) override
+    {
+      if (this->size > 1) {
+        mpi_err = MPI_Win_unlock(this->rank, this->state_win);
+        assert(mpi_err == MPI_SUCCESS);
+        VLOG(5) << "unlocked local state window";
+      }
+    }
+
+    void cleanup() override
+    {
+      if (this->size > 1) {
+        CVLOG(6, "Communicator") << "freeing windows";
+        MPI_Win_free(&(this->fine_win));
+        MPI_Win_free(&(this->coarse_win));
+        MPI_Win_free(&(this->state_win));
+      }
+    }
+};
+
+
+template<typename BaseControll>
+class RmaGetController
+  : public BaseControll
+{
+  public:
+    RmaGetController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
+      : BaseControll(comm, proc)
+    {
+      if (this->comm->size > 1) {
+        CVLOG(6, "Controller") << "creating windows";
+        shared_ptr<RmaGetProcess> _proc = dynamic_pointer_cast<RmaGetProcess>(this->proc);
+        shared_ptr<RmaGetCommunicator> _comm = dynamic_pointer_cast<RmaGetCommunicator>(this->comm);
+        MPI_Win_create(&(_proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(_comm->fine_win));
+        MPI_Win_create(&(_proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(_comm->coarse_win));
+        MPI_Win_create(&(_proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
+                       &(_comm->state_win));
+      }
+    }
+};
+
+
+int main(int argn, char** argv) {
+  //                       iter    residual    coarse      fine
+  log_fmt = boost::format("%4.d    %12.6f      %12.3f      %12.3f");
+
+  MPI_Init(&argn, &argv);
+
+  init_log(argn, argv);
+  init_additional_loggers();
+
+  int size = -1;
+  int rank = -1;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  MPI_Type_create_struct(3, block_length, block_displace, block_types, &process_state_type);
+  MPI_Type_commit(&process_state_type);
+  MPI_Type_size(process_state_type, &process_state_type_size);
+
+  int curr_step_start = 0;
+  double initial_value = FINE_MULTIPLIER;
+
+  do {
+    double mpi_start = MPI_Wtime();
+
+    int working_size = (curr_step_start + size - 1 < TOTAL_STEPS) ? size : TOTAL_STEPS % size;
+    LOG(INFO) << working_size << " processes will work now";
+
+    shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>(working_size);
+    shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
+    RmaGetController<FixedIterationController> controll(comm, proc);
+
+//     controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
+//     controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
+
+//     controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
+//     controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
+
+    controll._fine_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, comm->rank, true);
+    controll._coarse_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, comm->rank, false);
+
+    if (rank < working_size) {
+      proc->fine_val = initial_value;
+      proc->coarse_val = initial_value / FINE_MULTIPLIER;
+      LOG(INFO) << "inital values:\tcoarse=" << std::fixed << std::setprecision(3)
+                << proc->coarse_val << "\tfine=" << proc->fine_val;
+
+      controll.run();
+    } else {
+      // this rank hasn't to do anything anymore
+      LOG(WARNING) << "hasn't work anymore";
+    }
+
+    initial_value = proc->fine_val;
+
+    curr_step_start += size;
+  } while (curr_step_start < TOTAL_STEPS);
+
+  MPI_Type_free(&process_state_type);
+  VLOG(6) << "finalizing";
+  MPI_Finalize();
+}

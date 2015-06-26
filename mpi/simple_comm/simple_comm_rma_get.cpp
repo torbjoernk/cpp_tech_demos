@@ -1,4 +1,3 @@
-#define NO_LOGGING
 #include "simple_comm_config.hpp"
 
 

@@ -2,6 +2,7 @@ if(${Boost_FOUND})
   set(executables
     simple_comm_isend
     simple_comm_rma_get
+    simple_comm_rma_get_onefile
   )
 
   include_directories(${Boost_INCLUDE_DIRS})
