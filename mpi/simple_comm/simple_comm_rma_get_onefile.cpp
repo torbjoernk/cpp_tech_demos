@@ -168,7 +168,7 @@ class Process
       MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
     }
 
-    virtual void comp_fine(/*function<void(int)> delay*/)
+    virtual void comp_fine(function<void(int)> delay)
     {
       CVLOG(2, "Process") << "start computation";
       this->fine_val += (this->rank + 1) * FINE_MULTIPLIER + this->state.iter * 0.001;
@@ -176,11 +176,11 @@ class Process
                           << ((this->state.iter + 1) * FINE_MULTIPLIER)
                           << " + " << (this->state.iter * 0.001);
 
-      default_fine_delay(this->state.iter);
+      delay(this->state.iter);
       CVLOG(2, "Process") << "done computation";
     }
 
-    virtual void comp_coarse(/*function<void(int)> delay*/)
+    virtual void comp_coarse(function<void(int)> delay)
     {
       CVLOG(2, "Process") << "start computation";
       this->coarse_val += (this->rank + 1) * COARSE_MULTIPLIER + this->state.iter * 0.001;
@@ -188,7 +188,7 @@ class Process
                           << ((this->state.iter + 1) * COARSE_MULTIPLIER)
                           << " + " << (this->state.iter * 0.001);
 
-      default_coarse_delay(this->state.iter);
+      delay(this->state.iter);
       CVLOG(2, "Process") << "done computation";
     }
 
@@ -311,7 +311,7 @@ class Controller
       this->comm->recv_fine(this->proc);
       this->comm->pre_comp_fine(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_FINE);
-      this->proc->comp_fine(/*this->_fine_delay*/);
+      this->proc->comp_fine(this->_fine_delay);
       this->comm->post_comp_fine(this->proc);
       this->comm->send_fine(this->proc);
     }
@@ -322,7 +322,7 @@ class Controller
       this->comm->recv_coarse(this->proc);
       this->comm->pre_comp_coarse(this->proc);
       this->comm->set_pstate(this->proc, PState::ITER_COARSE);
-      this->proc->comp_coarse(/*this->_coarse_delay*/);
+      this->proc->comp_coarse(this->_coarse_delay);
       this->comm->post_comp_coarse(this->proc);
       this->comm->send_coarse(this->proc);
     }
@@ -638,7 +638,7 @@ int main(int argn, char** argv) {
 
     shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>(working_size);
     shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
-    RmaGetController<Controller> controll(comm, proc);
+    RmaGetController<FixedIterationController> controll(comm, proc);
 
 //     controll._fine_delay = bind(random_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, BASE_DELAY * FINE_MULTIPLIER * FINE_DELAY_VARIANCE);
 //     controll._coarse_delay = bind(random_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, BASE_DELAY * COARSE_MULTIPLIER * COARSE_DELAY_VARIANCE);
@@ -646,8 +646,8 @@ int main(int argn, char** argv) {
 //     controll._fine_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, FINE_DEMINISH);
 //     controll._coarse_delay = bind(deminishing_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, COARSE_DEMINISH);
 
-//    controll._fine_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, comm->rank, true);
-//    controll._coarse_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, comm->rank, false);
+    controll._fine_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * FINE_MULTIPLIER, comm->rank, true);
+    controll._coarse_delay = bind(specific_delay, placeholders::_1, BASE_DELAY * COARSE_MULTIPLIER, comm->rank, false);
 
     if (rank < working_size) {
       proc->fine_val = initial_value;
