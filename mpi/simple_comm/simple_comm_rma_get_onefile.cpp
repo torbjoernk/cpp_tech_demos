@@ -375,54 +375,6 @@ class Controller
 };
 
 
-class FixedIterationController
-  : public Controller
-{
-  public:
-    int max_iter = 10;
-
-    FixedIterationController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
-      : Controller(comm, proc)
-    {}
-
-    int run() override
-    {
-      int iter = 0;
-      for(; iter < this->max_iter; ++iter) {
-        if (iter == 0) {
-          this->comm->set_pstate(this->proc, PState::PREDICTING);
-          for (int p = - this->comm->rank; p <= 0; ++p) {
-            CVLOG(2, "Controller") << "predict " << p;
-            this->comm->set_iter(this->proc, p);
-            this->do_coarse();
-            log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
-            CLOG(INFO, "Controller") << "PREDICT " << log_fmt;
-          }
-        } else {
-          this->comm->set_pstate(this->proc, PState::ITERATING);
-          this->comm->set_iter(this->proc, iter);
-          this->do_coarse();
-        }
-
-        this->do_fine();
-
-        this->check_state();
-        log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
-        CLOG(INFO, "Controller") << "ITERATE " << log_fmt;
-      }
-
-      this->comm->cleanup();
-
-      log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
-      CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
-
-      this->comm->bcast_fine(this->proc);
-
-      return iter;
-    }
-};
-
-
 
 class RmaGetProcess
   : public Process

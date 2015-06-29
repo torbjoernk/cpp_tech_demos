@@ -26,7 +26,7 @@ boost::format log_fmt;
 #define STATE_MULTIPLIER        10
 
 #define TOTAL_STEPS              4
-#define RESIDUAL_TOL             1  // seconds
+#define RESIDUAL_TOL             2  // seconds
 
 
 inline static void init_additional_loggers()
@@ -91,6 +91,11 @@ MPI_Datatype process_state_type;
 int process_state_type_size;
 
 
+inline static int fine_tag(const int iter)   { return (iter + 1) * FINE_MULTIPLIER; }
+inline static int coarse_tag(const int iter) { return (abs(iter) + 1) * (COARSE_MULTIPLIER / 10); }
+inline static int state_tag(const int iter)  { return (iter + 1) * STATE_MULTIPLIER; }
+
+
 static void default_fine_delay(const int iter=-1)
 {
   chrono::time_point<Clock> start, end;
@@ -128,9 +133,11 @@ class Process
     ProcessState state;
     ProcessState prev_state;
 
-    virtual void init(const double start_time)
+    Process(const double start_time)
+      : coarse_val(0.0), fine_val(0.0), rank(-1), mpi_start(start_time),
+        coarse_val_in(0.0), coarse_val_out(0.0), fine_val_in(0.0), fine_val_out(0.0)
     {
-      this->mpi_start = start_time;
+      MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
     }
 
     virtual void comp_fine(function<void(int)> delay = bind(default_fine_delay, -1))
@@ -180,12 +187,12 @@ class Process
 class Communicator
 {
   public:
-    int _size;
-    int _rank;
+    int size = -1;
+    int rank = -1;
     bool iam_first;
     bool iam_last;
-    int prev;
-    int next;
+    int prev = -1;
+    int next = -1;
 
     MPI_Status state_stat;
     MPI_Status fine_stat;
@@ -193,15 +200,14 @@ class Communicator
 
     int mpi_err = MPI_SUCCESS;
 
-    virtual void init(const int size)
+    Communicator(const int size)
     {
-      this->_size = size;
-      MPI_Comm_rank(MPI_COMM_WORLD, &(this->_rank));
-      assert(_rank >= 0 && size > 0);
-      this->iam_first = (this->_rank == 0);
-      this->iam_last = (this->_rank == size - 1);
-      if (!this->iam_first) { this->prev = this->_rank - 1; }
-      if (!this->iam_last) { this->next = this->_rank + 1; }
+      MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
+      assert(rank >= 0 && size > 0);
+      this->iam_first = (rank == 0);
+      this->iam_last = (rank == size - 1);
+      if (!this->iam_first) { this->prev = this->rank - 1; }
+      if (!this->iam_last) { this->next = this->rank + 1; }
       this->state_stat = MPI_Status_factory();
       this->fine_stat = MPI_Status_factory();
       this->coarse_stat = MPI_Status_factory();
@@ -247,9 +253,9 @@ class Communicator
     virtual void post_update_state(shared_ptr<Process> proc) {}
     virtual void send_state(shared_ptr<Process> proc) {}
 
-    virtual void bcast_fine(shared_ptr<Process> proc, const int wsize) {
+    virtual void bcast_fine(shared_ptr<Process> proc) {
       CVLOG(4, "Communicator") << "broadcasting final value to all";
-      mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, wsize - 1, MPI_COMM_WORLD);
+      mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, this->size - 1, MPI_COMM_WORLD);
       assert(mpi_err == MPI_SUCCESS);
     }
 
@@ -257,22 +263,15 @@ class Communicator
 };
 
 
-template<class CommT, class ProcT>
 class Controller
 {
   public:
-    shared_ptr<CommT> comm;
-    shared_ptr<ProcT> proc;
+    shared_ptr<Communicator> comm;
+    shared_ptr<Process> proc;
 
-    explicit Controller(shared_ptr<CommT> comm, shared_ptr<ProcT> proc)
+    Controller(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
       : comm(comm), proc(proc)
     {}
-
-    virtual void init(const int wsize, const double start_time)
-    {
-      this->comm->init(wsize);
-      this->proc->init(start_time);
-    }
 
     virtual void do_fine()
     {
@@ -306,13 +305,13 @@ class Controller
       this->comm->send_state(this->proc);
     }
 
-    virtual int run(const int wsize)
+    virtual int run()
     {
       int iter = 0;
       for(; this->proc->state.state > PState::FAILED; ++iter) {
         if (iter == 0) {
           this->comm->set_pstate(this->proc, PState::PREDICTING);
-          for (int p = - this->comm->_rank; p <= 0; ++p) {
+          for (int p = - this->comm->rank; p <= 0; ++p) {
             CVLOG(2, "Controller") << "predict " << p;
             this->comm->set_iter(this->proc, p);
             this->do_coarse();
@@ -337,8 +336,6 @@ class Controller
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
 
-      this->comm->bcast_fine(this->proc, wsize);
-
       return iter;
     }
 };
@@ -346,7 +343,12 @@ class Controller
 
 class RmaGetProcess
   : public Process
-{};
+{
+  public:
+    RmaGetProcess(const double start_time)
+      : Process(start_time)
+    {}
+};
 
 
 class RmaGetCommunicator
@@ -357,8 +359,8 @@ class RmaGetCommunicator
     MPI_Win fine_win;
     MPI_Win state_win;
 
-    RmaGetCommunicator()
-      : Communicator()
+    RmaGetCommunicator(const int size)
+      : Communicator(size)
     {
       this->coarse_win = MPI_WIN_NULL;
       this->fine_win = MPI_WIN_NULL;
@@ -367,7 +369,7 @@ class RmaGetCommunicator
 
     void recv_fine(shared_ptr<Process> proc) override
     {
-      if (this->_size > 1 && !this->iam_first && proc->state.iter > 0) {
+      if (this->size > 1 && !this->iam_first && proc->state.iter > 0) {
         CVLOG(5, "Communicator") << "locking fine window to rank " << this->prev;
         mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->prev, 0, this->fine_win);
         assert(mpi_err == MPI_SUCCESS);
@@ -386,9 +388,9 @@ class RmaGetCommunicator
     {
       Communicator::pre_comp_fine(proc);
 
-      if (this->_size > 1) {
+      if (this->size > 1) {
         CVLOG(5, "Communicator") << "locking local fine window";
-        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->_rank, 0, this->fine_win);
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->rank, 0, this->fine_win);
         assert(mpi_err == MPI_SUCCESS);
       }
 
@@ -401,8 +403,8 @@ class RmaGetCommunicator
 
       proc->fine_val_out = proc->fine_val;
 
-      if (this->_size > 1) {
-        mpi_err = MPI_Win_unlock(this->_rank, this->fine_win);
+      if (this->size > 1) {
+        mpi_err = MPI_Win_unlock(this->rank, this->fine_win);
         assert(mpi_err == MPI_SUCCESS);
         CVLOG(5, "Communicator") << "unlocked local fine window";
       }
@@ -410,7 +412,7 @@ class RmaGetCommunicator
 
     void recv_coarse(shared_ptr<Process> proc) override
     {
-      if (this->_size > 1 && !this->iam_first && proc->state.iter != - this->_rank) {
+      if (this->size > 1 && !this->iam_first && proc->state.iter != - this->rank) {
         CVLOG(5, "Communicator") << "locking coarse window to rank " << this->prev;
         mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->prev, 0, this->coarse_win);
         assert(mpi_err == MPI_SUCCESS);
@@ -429,9 +431,9 @@ class RmaGetCommunicator
     {
       Communicator::pre_comp_coarse(proc);
 
-      if (this->_size > 1) {
+      if (this->size > 1) {
         CVLOG(5, "Communicator") << "locking local coarse window";
-        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->_rank, 0, this->coarse_win);
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->rank, 0, this->coarse_win);
         assert(mpi_err == MPI_SUCCESS);
       }
 
@@ -444,8 +446,8 @@ class RmaGetCommunicator
 
       proc->coarse_val_out = proc->coarse_val;
 
-      if (this->_size > 1) {
-        mpi_err = MPI_Win_unlock(this->_rank, this->coarse_win);
+      if (this->size > 1) {
+        mpi_err = MPI_Win_unlock(this->rank, this->coarse_win);
         assert(mpi_err == MPI_SUCCESS);
         CVLOG(5, "Communicator") << "unlocked local coarse window";
       }
@@ -453,7 +455,7 @@ class RmaGetCommunicator
 
     void recv_state(shared_ptr<Process> proc) override
     {
-      if (this->_size > 1 && !this->iam_first) {
+      if (this->size > 1 && !this->iam_first) {
         CVLOG(5, "Communicator") << "locking state window to rank " << this->prev;
         mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->prev, 0, this->state_win);
         assert(mpi_err == MPI_SUCCESS);
@@ -473,17 +475,17 @@ class RmaGetCommunicator
 
     void pre_update_state(shared_ptr<Process> proc) override
     {
-      if (this->_size > 1) {
+      if (this->size > 1) {
         CVLOG(5, "Communicator") << "locking local state window";
-        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->_rank, 0, this->state_win);
+        mpi_err = MPI_Win_lock(MPI_LOCK_EXCLUSIVE, this->rank, 0, this->state_win);
         assert(mpi_err == MPI_SUCCESS);
       }
     }
 
     void post_update_state(shared_ptr<Process> proc) override
     {
-      if (this->_size > 1) {
-        mpi_err = MPI_Win_unlock(this->_rank, this->state_win);
+      if (this->size > 1) {
+        mpi_err = MPI_Win_unlock(this->rank, this->state_win);
         assert(mpi_err == MPI_SUCCESS);
         VLOG(5) << "unlocked local state window";
       }
@@ -491,7 +493,7 @@ class RmaGetCommunicator
 
     void cleanup() override
     {
-      if (this->_size > 1) {
+      if (this->size > 1) {
         CVLOG(6, "Communicator") << "freeing windows";
         MPI_Win_free(&(this->fine_win));
         MPI_Win_free(&(this->coarse_win));
@@ -502,23 +504,22 @@ class RmaGetCommunicator
 
 
 class RmaGetController
-  : public Controller<RmaGetCommunicator, RmaGetProcess>
+  : public Controller
 {
   public:
-    explicit RmaGetController(shared_ptr<RmaGetCommunicator> comm, shared_ptr<RmaGetProcess> proc)
-      : Controller<RmaGetCommunicator, RmaGetProcess>(comm, proc)
-    {}
-
-    void init(const int wsize, const double start_time) {
-      Controller<RmaGetCommunicator, RmaGetProcess>::init(wsize, start_time);
-      if (this->comm->_size > 1) {
+    RmaGetController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
+      : Controller(comm, proc)
+    {
+      if (this->comm->size > 1) {
         CVLOG(6, "Controller") << "creating windows";
-        MPI_Win_create(&(this->proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
-                       MPI_COMM_WORLD, &(this->comm->fine_win));
-        MPI_Win_create(&(this->proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
-                       MPI_COMM_WORLD, &(this->comm->coarse_win));
-        MPI_Win_create(&(this->proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
-                       &(this->comm->state_win));
+        shared_ptr<RmaGetProcess> _proc = dynamic_pointer_cast<RmaGetProcess>(this->proc);
+        shared_ptr<RmaGetCommunicator> _comm = dynamic_pointer_cast<RmaGetCommunicator>(this->comm);
+        MPI_Win_create(&(_proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(_comm->fine_win));
+        MPI_Win_create(&(_proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(_comm->coarse_win));
+        MPI_Win_create(&(_proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
+                       &(_comm->state_win));
       }
     }
 };
@@ -531,7 +532,6 @@ int main(int argn, char** argv) {
   MPI_Init(&argn, &argv);
 
   init_log(argn, argv);
-  init_additional_loggers();
 
   int size = -1;
   int rank = -1;
@@ -545,17 +545,15 @@ int main(int argn, char** argv) {
   int curr_step_start = 0;
   double initial_value = FINE_MULTIPLIER;
 
-  shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>();
-  shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>();
-  RmaGetController controll(comm, proc);
-
   do {
     double mpi_start = MPI_Wtime();
 
     int working_size = (curr_step_start + size - 1 < TOTAL_STEPS) ? size : TOTAL_STEPS % size;
     LOG(INFO) << working_size << " processes will work now";
 
-    controll.init(working_size, mpi_start);
+    shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>(working_size);
+    shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
+    RmaGetController controll(comm, proc);
 
     if (rank < working_size) {
       proc->fine_val = initial_value;
@@ -563,7 +561,7 @@ int main(int argn, char** argv) {
       LOG(INFO) << "inital values:\tcoarse=" << std::fixed << std::setprecision(3)
                 << proc->coarse_val << "\tfine=" << proc->fine_val;
 
-      controll.run(working_size);
+      controll.run();
     } else {
       // this rank hasn't to do anything anymore
       LOG(WARNING) << "hasn't work anymore";
