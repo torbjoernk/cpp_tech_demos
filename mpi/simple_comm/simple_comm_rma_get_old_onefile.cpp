@@ -184,6 +184,7 @@ class Process
 };
 
 
+template<class ProcT>
 class Communicator
 {
   public:
@@ -213,47 +214,47 @@ class Communicator
       this->coarse_stat = MPI_Status_factory();
     }
 
-    virtual void set_pstate(shared_ptr<Process> proc, const PState new_state)
+    virtual void set_pstate(shared_ptr<ProcT> proc, const PState new_state)
     {
       this->pre_update_state(proc);
       proc->state.state = new_state;
       this->post_update_state(proc);
     }
-    virtual void set_iter(shared_ptr<Process> proc, const int iter)
+    virtual void set_iter(shared_ptr<ProcT> proc, const int iter)
     {
       this->pre_update_state(proc);
       proc->state.iter = iter;
       this->post_update_state(proc);
     }
 
-    virtual void recv_fine(shared_ptr<Process> proc) {}
-    virtual void pre_comp_fine(shared_ptr<Process> proc)
+    virtual void recv_fine(shared_ptr<ProcT> proc) {}
+    virtual void pre_comp_fine(shared_ptr<ProcT> proc)
     {
       this->set_pstate(proc, PState::PRE_ITER_FINE);
     }
-    virtual void post_comp_fine(shared_ptr<Process> proc)
+    virtual void post_comp_fine(shared_ptr<ProcT> proc)
     {
       this->set_pstate(proc, PState::POST_ITER_FINE);
     }
-    virtual void send_fine(shared_ptr<Process> proc) {}
+    virtual void send_fine(shared_ptr<ProcT> proc) {}
 
-    virtual void recv_coarse(shared_ptr<Process> proc) {}
-    virtual void pre_comp_coarse(shared_ptr<Process> proc)
+    virtual void recv_coarse(shared_ptr<ProcT> proc) {}
+    virtual void pre_comp_coarse(shared_ptr<ProcT> proc)
     {
       this->set_pstate(proc, PState::PRE_ITER_COARSE);
     }
-    virtual void post_comp_coarse(shared_ptr<Process> proc)
+    virtual void post_comp_coarse(shared_ptr<ProcT> proc)
     {
       this->set_pstate(proc, PState::POST_ITER_COARSE);
     }
-    virtual void send_coarse(shared_ptr<Process> proc) {}
+    virtual void send_coarse(shared_ptr<ProcT> proc) {}
 
-    virtual void recv_state(shared_ptr<Process> proc) {}
-    virtual void pre_update_state(shared_ptr<Process> proc) {}
-    virtual void post_update_state(shared_ptr<Process> proc) {}
-    virtual void send_state(shared_ptr<Process> proc) {}
+    virtual void recv_state(shared_ptr<ProcT> proc) {}
+    virtual void pre_update_state(shared_ptr<ProcT> proc) {}
+    virtual void post_update_state(shared_ptr<ProcT> proc) {}
+    virtual void send_state(shared_ptr<ProcT> proc) {}
 
-    virtual void bcast_fine(shared_ptr<Process> proc) {
+    virtual void bcast_fine(shared_ptr<ProcT> proc) {
       CVLOG(4, "Communicator") << "broadcasting final value to all";
       mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, this->size - 1, MPI_COMM_WORLD);
       assert(mpi_err == MPI_SUCCESS);
@@ -263,13 +264,14 @@ class Communicator
 };
 
 
+template<class CommT, class ProcT>
 class Controller
 {
   public:
-    shared_ptr<Communicator> comm;
-    shared_ptr<Process> proc;
+    shared_ptr<CommT> comm;
+    shared_ptr<ProcT> proc;
 
-    Controller(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
+    Controller(shared_ptr<CommT> comm, shared_ptr<ProcT> proc)
       : comm(comm), proc(proc)
     {}
 
@@ -352,7 +354,7 @@ class RmaGetProcess
 
 
 class RmaGetCommunicator
-  : public Communicator
+  : public Communicator<RmaGetProcess>
 {
   public:
     MPI_Win coarse_win;
@@ -360,14 +362,14 @@ class RmaGetCommunicator
     MPI_Win state_win;
 
     RmaGetCommunicator(const int size)
-      : Communicator(size)
+      : Communicator<RmaGetProcess>(size)
     {
       this->coarse_win = MPI_WIN_NULL;
       this->fine_win = MPI_WIN_NULL;
       this->state_win = MPI_WIN_NULL;
     }
 
-    void recv_fine(shared_ptr<Process> proc) override
+    void recv_fine(shared_ptr<RmaGetProcess> proc) override
     {
       if (this->size > 1 && !this->iam_first && proc->state.iter > 0) {
         CVLOG(5, "Communicator") << "locking fine window to rank " << this->prev;
@@ -384,9 +386,9 @@ class RmaGetCommunicator
       }
     }
 
-    void pre_comp_fine(shared_ptr<Process> proc) override
+    void pre_comp_fine(shared_ptr<RmaGetProcess> proc) override
     {
-      Communicator::pre_comp_fine(proc);
+      Communicator<RmaGetProcess>::pre_comp_fine(proc);
 
       if (this->size > 1) {
         CVLOG(5, "Communicator") << "locking local fine window";
@@ -397,9 +399,9 @@ class RmaGetCommunicator
       proc->fine_val = proc->fine_val_in;
     }
 
-    void post_comp_fine(shared_ptr<Process> proc) override
+    void post_comp_fine(shared_ptr<RmaGetProcess> proc) override
     {
-      Communicator::post_comp_fine(proc);
+      Communicator<RmaGetProcess>::post_comp_fine(proc);
 
       proc->fine_val_out = proc->fine_val;
 
@@ -410,7 +412,7 @@ class RmaGetCommunicator
       }
     }
 
-    void recv_coarse(shared_ptr<Process> proc) override
+    void recv_coarse(shared_ptr<RmaGetProcess> proc) override
     {
       if (this->size > 1 && !this->iam_first && proc->state.iter != - this->rank) {
         CVLOG(5, "Communicator") << "locking coarse window to rank " << this->prev;
@@ -427,9 +429,9 @@ class RmaGetCommunicator
       }
     }
 
-    void pre_comp_coarse(shared_ptr<Process> proc) override
+    void pre_comp_coarse(shared_ptr<RmaGetProcess> proc) override
     {
-      Communicator::pre_comp_coarse(proc);
+      Communicator<RmaGetProcess>::pre_comp_coarse(proc);
 
       if (this->size > 1) {
         CVLOG(5, "Communicator") << "locking local coarse window";
@@ -440,9 +442,9 @@ class RmaGetCommunicator
       proc->coarse_val = proc->coarse_val_in;
     }
 
-    void post_comp_coarse(shared_ptr<Process> proc) override
+    void post_comp_coarse(shared_ptr<RmaGetProcess> proc) override
     {
-      Communicator::post_comp_coarse(proc);
+      Communicator<RmaGetProcess>::post_comp_coarse(proc);
 
       proc->coarse_val_out = proc->coarse_val;
 
@@ -453,7 +455,7 @@ class RmaGetCommunicator
       }
     }
 
-    void recv_state(shared_ptr<Process> proc) override
+    void recv_state(shared_ptr<RmaGetProcess> proc) override
     {
       if (this->size > 1 && !this->iam_first) {
         CVLOG(5, "Communicator") << "locking state window to rank " << this->prev;
@@ -473,7 +475,7 @@ class RmaGetCommunicator
       }
     }
 
-    void pre_update_state(shared_ptr<Process> proc) override
+    void pre_update_state(shared_ptr<RmaGetProcess> proc) override
     {
       if (this->size > 1) {
         CVLOG(5, "Communicator") << "locking local state window";
@@ -482,7 +484,7 @@ class RmaGetCommunicator
       }
     }
 
-    void post_update_state(shared_ptr<Process> proc) override
+    void post_update_state(shared_ptr<RmaGetProcess> proc) override
     {
       if (this->size > 1) {
         mpi_err = MPI_Win_unlock(this->rank, this->state_win);
@@ -504,22 +506,20 @@ class RmaGetCommunicator
 
 
 class RmaGetController
-  : public Controller
+  : public Controller<RmaGetCommunicator, RmaGetProcess>
 {
   public:
-    RmaGetController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
-      : Controller(comm, proc)
+    RmaGetController(shared_ptr<RmaGetCommunicator> comm, shared_ptr<RmaGetProcess> proc)
+      : Controller<RmaGetCommunicator, RmaGetProcess>(comm, proc)
     {
       if (this->comm->size > 1) {
         CVLOG(6, "Controller") << "creating windows";
-        shared_ptr<RmaGetProcess> _proc = dynamic_pointer_cast<RmaGetProcess>(this->proc);
-        shared_ptr<RmaGetCommunicator> _comm = dynamic_pointer_cast<RmaGetCommunicator>(this->comm);
-        MPI_Win_create(&(_proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
-                       MPI_COMM_WORLD, &(_comm->fine_win));
-        MPI_Win_create(&(_proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
-                       MPI_COMM_WORLD, &(_comm->coarse_win));
-        MPI_Win_create(&(_proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
-                       &(_comm->state_win));
+        MPI_Win_create(&(this->proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(this->comm->fine_win));
+        MPI_Win_create(&(this->proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(this->comm->coarse_win));
+        MPI_Win_create(&(this->proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
+                       &(this->comm->state_win));
       }
     }
 };
