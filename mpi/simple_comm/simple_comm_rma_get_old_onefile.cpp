@@ -128,11 +128,9 @@ class Process
     ProcessState state;
     ProcessState prev_state;
 
-    explicit Process(const double start_time)
-      : coarse_val(0.0), fine_val(0.0), rank(-1), mpi_start(start_time),
-        coarse_val_in(0.0), coarse_val_out(0.0), fine_val_in(0.0), fine_val_out(0.0)
+    virtual void init(const double start_time)
     {
-      MPI_Comm_rank(MPI_COMM_WORLD, &(this->rank));
+      this->mpi_start = start_time;
     }
 
     virtual void comp_fine(function<void(int)> delay = bind(default_fine_delay, -1))
@@ -195,9 +193,9 @@ class Communicator
 
     int mpi_err = MPI_SUCCESS;
 
-    explicit Communicator(const int size)
-      : _size(size), _rank(-1), iam_first(false), iam_last(false), prev(-1), next(-1)
+    virtual void init(const int size)
     {
+      this->_size = size;
       MPI_Comm_rank(MPI_COMM_WORLD, &(this->_rank));
       assert(_rank >= 0 && size > 0);
       this->iam_first = (this->_rank == 0);
@@ -269,6 +267,12 @@ class Controller
     explicit Controller(shared_ptr<CommT> comm, shared_ptr<ProcT> proc)
       : comm(comm), proc(proc)
     {}
+
+    virtual void init(const int wsize, const double start_time)
+    {
+      this->comm->init(wsize);
+      this->proc->init(start_time);
+    }
 
     virtual void do_fine()
     {
@@ -342,12 +346,7 @@ class Controller
 
 class RmaGetProcess
   : public Process
-{
-  public:
-    explicit RmaGetProcess(const double start_time)
-      : Process(start_time)
-    {}
-};
+{};
 
 
 class RmaGetCommunicator
@@ -358,8 +357,8 @@ class RmaGetCommunicator
     MPI_Win fine_win;
     MPI_Win state_win;
 
-    explicit RmaGetCommunicator(const int size)
-      : Communicator(size)
+    RmaGetCommunicator()
+      : Communicator()
     {
       this->coarse_win = MPI_WIN_NULL;
       this->fine_win = MPI_WIN_NULL;
@@ -542,15 +541,17 @@ int main(int argn, char** argv) {
   int curr_step_start = 0;
   double initial_value = FINE_MULTIPLIER;
 
+  shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>();
+  shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>();
+  RmaGetController controll(comm, proc);
+
   do {
     double mpi_start = MPI_Wtime();
 
     int working_size = (curr_step_start + size - 1 < TOTAL_STEPS) ? size : TOTAL_STEPS % size;
     LOG(INFO) << working_size << " processes will work now";
 
-    shared_ptr<RmaGetCommunicator> comm = make_shared<RmaGetCommunicator>(working_size);
-    shared_ptr<RmaGetProcess> proc = make_shared<RmaGetProcess>(mpi_start);
-    RmaGetController controll(comm, proc);
+    controll.init(working_size, mpi_start);
 
     if (rank < working_size) {
       proc->fine_val = initial_value;
