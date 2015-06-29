@@ -507,7 +507,10 @@ class RmaGetController
   public:
     explicit RmaGetController(shared_ptr<RmaGetCommunicator> comm, shared_ptr<RmaGetProcess> proc)
       : Controller<RmaGetCommunicator, RmaGetProcess>(comm, proc)
-    {
+    {}
+
+    void init(const int wsize, const double start_time) {
+      Controller<RmaGetCommunicator, RmaGetProcess>::init(wsize, start_time);
       if (this->comm->_size > 1) {
         CVLOG(6, "Controller") << "creating windows";
         MPI_Win_create(&(this->proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
