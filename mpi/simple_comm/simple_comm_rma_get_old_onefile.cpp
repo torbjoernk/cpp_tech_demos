@@ -247,9 +247,9 @@ class Communicator
     virtual void post_update_state(shared_ptr<Process> proc) {}
     virtual void send_state(shared_ptr<Process> proc) {}
 
-    virtual void bcast_fine(shared_ptr<Process> proc) {
+    virtual void bcast_fine(shared_ptr<Process> proc, const int wsize) {
       CVLOG(4, "Communicator") << "broadcasting final value to all";
-      mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, this->_size - 1, MPI_COMM_WORLD);
+      mpi_err = MPI_Bcast(&(proc->fine_val), 1, MPI_DOUBLE, wsize - 1, MPI_COMM_WORLD);
       assert(mpi_err == MPI_SUCCESS);
     }
 
@@ -306,7 +306,7 @@ class Controller
       this->comm->send_state(this->proc);
     }
 
-    virtual int run()
+    virtual int run(const int wsize)
     {
       int iter = 0;
       for(; this->proc->state.state > PState::FAILED; ++iter) {
@@ -337,7 +337,7 @@ class Controller
       log_fmt % iter % this->proc->state.residual % this->proc->coarse_val % this->proc->fine_val;
       CLOG(INFO, "Controller") << "FINISHED" << log_fmt;
 
-      this->comm->bcast_fine(this->proc);
+      this->comm->bcast_fine(this->proc, wsize);
 
       return iter;
     }
@@ -531,6 +531,7 @@ int main(int argn, char** argv) {
   MPI_Init(&argn, &argv);
 
   init_log(argn, argv);
+  init_additional_loggers();
 
   int size = -1;
   int rank = -1;
@@ -562,7 +563,7 @@ int main(int argn, char** argv) {
       LOG(INFO) << "inital values:\tcoarse=" << std::fixed << std::setprecision(3)
                 << proc->coarse_val << "\tfine=" << proc->fine_val;
 
-      controll.run();
+      controll.run(working_size);
     } else {
       // this rank hasn't to do anything anymore
       LOG(WARNING) << "hasn't work anymore";
