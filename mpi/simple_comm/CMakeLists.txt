@@ -3,6 +3,7 @@ if(${Boost_FOUND})
     simple_comm_isend
     simple_comm_rma_get
     simple_comm_rma_get_onefile
+    simple_comm_rma_get_old_onefile
   )
 
   include_directories(${Boost_INCLUDE_DIRS})

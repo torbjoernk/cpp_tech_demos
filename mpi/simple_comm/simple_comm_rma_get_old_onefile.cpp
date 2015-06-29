@@ -26,7 +26,7 @@ boost::format log_fmt;
 #define STATE_MULTIPLIER        10
 
 #define TOTAL_STEPS              4
-#define RESIDUAL_TOL             2  // seconds
+#define RESIDUAL_TOL             1  // seconds
 
 
 inline static void init_additional_loggers()
@@ -128,7 +128,7 @@ class Process
     ProcessState state;
     ProcessState prev_state;
 
-    Process(const double start_time)
+    explicit Process(const double start_time)
       : coarse_val(0.0), fine_val(0.0), rank(-1), mpi_start(start_time),
         coarse_val_in(0.0), coarse_val_out(0.0), fine_val_in(0.0), fine_val_out(0.0)
     {
@@ -259,13 +259,14 @@ class Communicator
 };
 
 
+template<class CommT, class ProcT>
 class Controller
 {
   public:
-    shared_ptr<Communicator> comm;
-    shared_ptr<Process> proc;
+    shared_ptr<CommT> comm;
+    shared_ptr<ProcT> proc;
 
-    Controller(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
+    explicit Controller(shared_ptr<CommT> comm, shared_ptr<ProcT> proc)
       : comm(comm), proc(proc)
     {}
 
@@ -343,7 +344,7 @@ class RmaGetProcess
   : public Process
 {
   public:
-    RmaGetProcess(const double start_time)
+    explicit RmaGetProcess(const double start_time)
       : Process(start_time)
     {}
 };
@@ -502,22 +503,20 @@ class RmaGetCommunicator
 
 
 class RmaGetController
-  : public Controller
+  : public Controller<RmaGetCommunicator, RmaGetProcess>
 {
   public:
-    RmaGetController(shared_ptr<Communicator> comm, shared_ptr<Process> proc)
-      : Controller(comm, proc)
+    explicit RmaGetController(shared_ptr<RmaGetCommunicator> comm, shared_ptr<RmaGetProcess> proc)
+      : Controller<RmaGetCommunicator, RmaGetProcess>(comm, proc)
     {
       if (this->comm->_size > 1) {
         CVLOG(6, "Controller") << "creating windows";
-        shared_ptr<RmaGetProcess> _proc = dynamic_pointer_cast<RmaGetProcess>(this->proc);
-        shared_ptr<RmaGetCommunicator> _comm = dynamic_pointer_cast<RmaGetCommunicator>(this->comm);
-        MPI_Win_create(&(_proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
-                       MPI_COMM_WORLD, &(_comm->fine_win));
-        MPI_Win_create(&(_proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
-                       MPI_COMM_WORLD, &(_comm->coarse_win));
-        MPI_Win_create(&(_proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
-                       &(_comm->state_win));
+        MPI_Win_create(&(this->proc->fine_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(this->comm->fine_win));
+        MPI_Win_create(&(this->proc->coarse_val_out), sizeof(double), MPI_DOUBLE, MPI_INFO_NULL,
+                       MPI_COMM_WORLD, &(this->comm->coarse_win));
+        MPI_Win_create(&(this->proc->state), 1, process_state_type_size, MPI_INFO_NULL, MPI_COMM_WORLD,
+                       &(this->comm->state_win));
       }
     }
 };
